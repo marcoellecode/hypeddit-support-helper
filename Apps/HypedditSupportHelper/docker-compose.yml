@@ -4,7 +4,7 @@
 # Oppure aggiungi come sorgente App Store:
 #   https://github.com/marcoellecode/hypeddit-support-helper/archive/refs/heads/main.zip
 # Non serve cambiare niente: installa, apri l'app e collega gli account da Impostazioni.
-# I dati stanno in /DATA/AppData/hypeddit-support-helper (come le altre app).
+# Dati (login, coda, impostazioni) in /DATA/AppData/hypeddit-support-helper; download in /DATA/Downloads/hypeddit.
 # Server Linux generico (non CasaOS): usa docker-compose.yml nella radice del repository.
 name: hypeddit-support-helper
 services:
@@ -30,7 +30,7 @@ services:
         source: /DATA/AppData/hypeddit-support-helper/data
         target: /data
       - type: bind
-        source: /DATA/AppData/hypeddit-support-helper/downloads
+        source: /DATA/Downloads/hypeddit
         target: /downloads
     x-casaos:
       envs:
