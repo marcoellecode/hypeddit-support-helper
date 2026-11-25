@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hypeddit Support Helper</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0d0f12; --panel: #14181e; --line: #262c36; --text: #e6e9ef; --muted: #8b93a3;
+    --accent: #3b82f6; --ok: #34d399; --warn: #fbbf24; --bad: #f87171; --code: #7fe3a0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 22px 16px 60px; }
+  h1 { font-size: 20px; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .tab { background: none; border: 0; color: var(--muted); padding: 10px 14px; font-size: 14px; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); margin-left: 6px; }
+  section[hidden] { display: none; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 14px; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  label.f.full { grid-column: 1 / -1; }
+  input[type=text], input[type=email], input[type=number], select, textarea {
+    background: #05070a; color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 10px; font: 14px system-ui, sans-serif; width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  textarea.urls { height: 160px; color: var(--code); font: 13px/1.5 ui-monospace, monospace; resize: vertical; }
+  .row { display: flex; gap: 10px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+  button.btn { background: var(--accent); color: #fff; border: 0; padding: 10px 18px; border-radius: 8px;
+    font-size: 14px; cursor: pointer; }
+  button.btn.sec { background: #232a35; color: var(--text); }
+  button.btn.danger { background: #b4412f; }
+  button.btn:disabled { background: #2a3340; color: #6b7280; cursor: default; }
+  .stat { color: var(--muted); font-size: 13px; }
+  .check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+  .check input { margin-top: 4px; }
+  .bar { height: 6px; background: #1b212a; border-radius: 99px; overflow: hidden; margin-top: 8px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+  .logs { background: #05070a; border: 1px solid var(--line); border-radius: 10px; padding: 12px; height: 220px;
+    overflow: auto; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
+  .banner { border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; display: flex;
+    gap: 10px; align-items: center; justify-content: space-between; background: #16130a; border: 1px solid #4a3c15; color: #e8d9a8; }
+  .banner button { flex: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  td.url { word-break: break-all; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .b-downloaded { background: #0f2a20; color: var(--ok); }
+  .b-no-download, .b-stopped, .b-needs-manual { background: #2a230f; color: var(--warn); }
+  .b-error { background: #2d1414; color: var(--bad); }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1d2430; border: 1px solid var(--line);
+    padding: 10px 16px; border-radius: 10px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .toast.show { opacity: 1; }
+  .toast.err { border-color: var(--bad); color: var(--bad); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .acct { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .pill { font-size: 12px; padding: 3px 10px; border-radius: 99px; }
+  .accts { display: grid; gap: 10px; }
+  .acc { display: grid; grid-template-columns: 130px 1fr auto; gap: 12px; align-items: center; padding: 12px;
+    background: #0f1318; border: 1px solid var(--line); border-radius: 10px; }
+  .acc .nm { font-weight: 600; font-size: 14px; }
+  .acc .extra { grid-column: 1 / -1; }
+  @media (max-width: 600px) { .acc { grid-template-columns: 1fr auto; } }
+  .pill.ok { background: #0f2a20; color: var(--ok); } .pill.no { background: #2a230f; color: var(--warn); }
+  /* ---- scheda API ---- */
+  code { font: 12.5px ui-monospace, monospace; color: var(--code); background: #0a0d11; padding: 1px 5px; border-radius: 5px; }
+  .apilist { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text); }
+  .apilist li { margin: 4px 0; }
+  .apig { margin: 22px 0 8px; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  details.ep { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; }
+  details.ep > summary { list-style: none; cursor: pointer; padding: 11px 14px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; color: var(--text); font-size: 14px; }
+  details.ep > summary::-webkit-details-marker { display: none; }
+  details.ep > summary .pth { font: 13px ui-monospace, monospace; color: var(--text); }
+  details.ep > summary .ttl { color: var(--muted); font-size: 13px; flex: 1 1 200px; }
+  details.ep[open] > summary { border-bottom: 1px solid var(--line); }
+  .epb { padding: 12px 14px 14px; font-size: 13px; }
+  .epb p { margin: 0 0 10px; }
+  .meth { font: 700 11px ui-monospace, monospace; padding: 2px 7px; border-radius: 6px; min-width: 58px; text-align: center; display: inline-block; }
+  .m-GET { background: #0f2a20; color: var(--ok); } .m-POST { background: #11213d; color: #7db0ff; } .m-DELETE { background: #2d1414; color: var(--bad); }
+  .epb h4 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .epb table td:first-child { white-space: nowrap; width: 1%; padding-right: 14px; }
+  .epb .ty { color: var(--muted); font-size: 12px; }
+  .codebox { position: relative; }
+  .codebox pre { margin: 0; background: #05070a; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 12px/1.55 ui-monospace, monospace;
+    color: #cfe9d8; overflow: auto; white-space: pre; max-height: 320px; }
+  .codebox button.cp { position: absolute; top: 6px; right: 6px; padding: 3px 9px; font-size: 11px; background: #232a35; color: var(--text); border: 0; border-radius: 6px; cursor: pointer; }
+  .try { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .try .row { margin: 6px 0; }
+  .try input[type=text] { font-family: ui-monospace, monospace; font-size: 12.5px; }
+  .try textarea { font: 12px/1.5 ui-monospace, monospace; color: var(--code); height: 84px; }
+  .warnbox { background: #16130a; border: 1px solid #4a3c15; color: #e8d9a8; border-radius: 8px; padding: 7px 10px; margin: 0 0 10px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Hypeddit Support Helper</h1>
+  <p class="sub">Supporta gli artisti in sequenza coi tuoi account reali. Le azioni social restano autentiche.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="queue">Coda</button>
+    <button class="tab" data-tab="settings">Impostazioni</button>
+    <button class="tab" data-tab="api">API</button>
+  </div>
+
+  <!-- ===================== CODA ===================== -->
+  <section id="tab-queue">
+    <div class="card">
+      <h2>Tracce da supportare</h2>
+      <textarea class="urls" id="list" spellcheck="false"
+        placeholder="Incolla un URL Hypeddit per riga&#10;https://hypeddit.com/artista/traccia&#10;https://hypeddit.com/artista/altra-traccia"></textarea>
+      <div class="row">
+        <button class="btn" id="start">▶ Avvia coda</button>
+        <button class="btn danger" id="stop" disabled>■ Stop</button>
+        <label class="check"><input type="checkbox" id="skipDone" checked /> salta tracce già scaricate</label>
+        <span class="stat" id="urlCount"></span>
+      </div>
+      <div class="stat" id="stat">Pronto</div>
+      <div class="bar"><i id="barFill"></i></div>
+    </div>
+
+    <div class="card">
+      <h2>Log</h2>
+      <div class="logs" id="logs"></div>
+    </div>
+
+    <div class="card">
+      <h2>Cronologia</h2>
+      <div class="row" style="margin-top:0">
+        <button class="btn sec" id="openDl">📂 Apri cartella download</button>
+        <button class="btn sec" id="requeue">↻ Riaccoda quelle non scaricate</button>
+        <button class="btn sec" id="clearHist">Azzera cronologia</button>
+      </div>
+      <div id="histEmpty" class="stat">Ancora nessuna traccia elaborata.</div>
+      <table id="histTable" hidden>
+        <thead><tr><th>Traccia</th><th>Esito</th><th>File</th></tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== IMPOSTAZIONI ===================== -->
+  <section id="tab-settings" hidden>
+    <div class="card">
+      <h2>Account <span class="stat" id="browserUsed"></span></h2>
+      <p class="hint" style="margin:0 0 12px">Configurali separatamente e solo quelli che vuoi: per scaricare non serve averli tutti.
+        "Accedi" apre <b>un browser normale</b> (non pilotato), quindi puoi usare anche <b>“Accedi con Google”</b>.
+        Quando hai finito chiudi quella finestra: lo stato si aggiorna da solo.</p>
+      <div class="accts">
+        <div class="acc">
+          <div class="nm">SoundCloud</div>
+          <div><span class="pill no" id="pill_soundcloud">Non verificato</span></div>
+          <button class="btn" data-login="soundcloud">Accedi</button>
+          <label class="f extra">Commento da lasciare
+            <input type="text" id="comment" placeholder="support" /></label>
+        </div>
+        <div class="acc">
+          <div class="nm">Spotify</div>
+          <div><span class="pill no" id="pill_spotify">Non verificato</span></div>
+          <button class="btn" data-login="spotify">Accedi</button>
+        </div>
+        <div class="acc">
+          <div class="nm">Instagram</div>
+          <div><span class="pill no" id="pill_instagram">Non verificato</span></div>
+          <button class="btn" data-login="instagram">Accedi</button>
+        </div>
+        <div class="acc">
+          <div class="nm">Email</div>
+          <div><span class="pill no" id="pill_email">Non impostata</span></div>
+          <button class="btn" id="saveEmail">Salva</button>
+          <div class="grid extra">
+            <label class="f">Nome<input type="text" id="name" placeholder="Il tuo nome" /></label>
+            <label class="f">Email<input type="email" id="email" placeholder="tua@email.com" /></label>
+          </div>
+          <div class="hint extra" style="margin:0">Usati nello step "email" del gate. Se vuoti, quello step lo compili tu a mano.</div>
+        </div>
+      </div>
+      <div class="row"><button class="btn sec" id="checkAcc">↻ Verifica collegamenti</button>
+        <span class="stat" id="checkNote"></span></div>
+    </div>
+
+    <div class="card">
+      <h2>Comportamento</h2>
+      <p class="hint" style="margin:0 0 4px">Tutto gira in background (headless), senza finestre e senza chiederti nulla: SoundCloud (follow/like/repost),
+        Spotify (consenso) e Instagram (follow) sono azioni vere, verificate e mai tolte se già attive. Se un passaggio non riesce
+        (account non collegato, captcha, step non supportato) la traccia è segnata <b>"da fare a mano"</b> con il motivo e la coda prosegue.</p>
+      <label class="check"><input type="checkbox" id="autoStart" />
+        <span>Avvia la coda da sola quando arriva un link via API <span class="hint">(altrimenti i link aspettano il pulsante Avvia o la chiamata /api/queue/start)</span></span>
+      </label>
+      <label class="check"><input type="checkbox" id="showBrowser" />
+        <span>Mostra il browser mentre lavora <span class="hint">(solo diagnostica: non aggiunge interazione)</span></span>
+      </label>
+      <div class="grid" style="margin-top:14px">
+        <label class="f">Pausa tra le tracce (secondi)<input type="number" id="pauseSec" min="0" max="600" /></label>
+        <label class="f">Variazione casuale in più (secondi)<input type="number" id="jitterSec" min="0" max="600" /></label>
+        <label class="f">Massimo tracce per esecuzione (0 = nessun limite)<input type="number" id="maxTracksPerRun" min="0" max="1000" /></label>
+        <label class="f">Browser
+          <select id="browserChannel">
+            <option value="auto">Automatico (Chrome, altrimenti Edge)</option>
+            <option value="chrome">Google Chrome</option>
+            <option value="msedge">Microsoft Edge</option>
+            <option value="chromium">Chromium incluso (no login Google)</option>
+          </select>
+        </label>
+        <label class="f full">Cartella dei download<input type="text" id="downloadDir" /></label>
+      </div>
+      <p class="hint">Ritmi calmi e volumi moderati riducono il rischio che le piattaforme limitino i tuoi account.</p>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Avanzate: selettori del gate Hypeddit</summary>
+        <p class="hint">Cambiali solo se Hypeddit modifica la pagina (F12 → Elements) e un passaggio smette di funzionare.</p>
+        <div class="grid" id="selGrid"></div>
+        <div class="row"><button class="btn sec" id="resetSel">Ripristina predefiniti</button></div>
+      </details>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="saveBtn">Salva impostazioni</button>
+      <span class="stat" id="saveNote"></span>
+    </div>
+  </section>
+
+  <!-- ===================== API ===================== -->
+  <section id="tab-api" hidden>
+    <div class="card">
+      <h2>Come funziona</h2>
+      <p class="hint" style="font-size:13px;margin:0 0 10px">
+        L'app ha un'API REST in JSON: puoi aggiungere link alla coda, avviarla e fermarla, leggere esiti e log da
+        script, automazioni o altri programmi. Tutto quello che fai da questa pagina si può fare anche così.</p>
+      <ul class="apilist">
+        <li><b>La coda è persistente</b> (sopravvive ai riavvii) e puoi aggiungere link <b>anche mentre lavora</b>: li prende da sola.</li>
+        <li>Un link aggiunto <b>non parte da solo</b>, salvo che mandi <code>"start": true</code> oppure sia attiva, in Impostazioni,
+          l'opzione <i>"Avvia la coda da sola quando arriva un link via API"</i>.</li>
+        <li>Le tracce già scaricate vengono rifiutate (<code>alreadyDownloaded</code>) salvo <code>"skipDone": false</code>.</li>
+        <li><b>Attenzione:</b> avviare la coda esegue azioni vere (follow, like, repost, commenti) sui tuoi account social.</li>
+      </ul>
+      <div class="row" style="margin:10px 0 4px">
+        <span class="stat">Indirizzo base:</span> <code id="apiBase"></code>
+        <button class="btn sec cp" data-copy="base" type="button">Copia</button>
+      </div>
+      <div class="row" style="margin:6px 0">
+        <span class="stat">Mostra esempi per:</span>
+        <select id="apiStyle" style="width:auto"><option value="ps">PowerShell</option><option value="curl">curl (bash)</option></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Autenticazione</h2>
+      <p class="hint" style="font-size:13px;margin:0 0 8px" id="apiAuth">Verifico…</p>
+      <p class="hint" style="font-size:13px;margin:0 0 8px">Se il server richiede il token (variabile <code>HSH_API_TOKEN</code>), ogni chiamata deve avere
+        l'header <code>Authorization: Bearer &lt;token&gt;</code> (oppure <code>X-API-Key: &lt;token&gt;</code>). Negli esempi trovi
+        <code>IL_TUO_TOKEN</code> al suo posto. Solo <code>/api/health</code> non lo richiede.</p>
+      <div class="row" style="margin:4px 0">
+        <input type="password" id="apiTok" placeholder="Token per i pulsanti «Prova» di questa pagina" style="max-width:360px" autocomplete="off" />
+        <button class="btn sec" id="apiTokSave" type="button">Salva in questo browser</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Risposte e codici</h2>
+      <table>
+        <tr><td><code>200</code> / <code>201</code></td><td>OK (<code>201</code> = qualcosa è stato creato, es. link aggiunti).</td></tr>
+        <tr><td><code>400</code></td><td>Richiesta non valida (nessun URL valido, JSON rotto, coda vuota…). Il corpo ha sempre <code>{"error": "…"}</code>.</td></tr>
+        <tr><td><code>401</code></td><td>Token mancante o errato.</td></tr>
+        <tr><td><code>403</code></td><td>Host o origine non ammessi: l'indirizzo con cui chiami non è in <code>HSH_ALLOWED_HOSTS</code>.</td></tr>
+        <tr><td><code>404</code></td><td>Elemento non trovato (URL non in coda, file inesistente).</td></tr>
+        <tr><td><code>409</code></td><td>Conflitto: già in esecuzione, finestra di login già aperta…</td></tr>
+      </table>
+      <p class="hint" style="margin:10px 0 0">Esiti nella cronologia (<code>status</code>): <code>downloaded</code> scaricata ·
+        <code>needs-manual</code> da fare a mano (con <code>reason</code>) · <code>no-download</code> nessun file ·
+        <code>error</code> errore · <code>stopped</code> interrotta.</p>
+    </div>
+
+    <div id="apiGroups"></div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const SEL_LABELS = {
+  getTrackButton: "Pulsante \"Get this track\"", stepContainer: "Contenitore degli step",
+  currentStep: "Step corrente", emailName: "Campo nome", emailAddress: "Campo email",
+  emailNext: "Pulsante avanti (email)", scComment: "Campo commento SoundCloud", downloadButton: "Pulsante download",
+};
+let status = null;
+
+// ---------- util ----------
+function toast(msg, err) {
+  const t = $("toast"); t.textContent = msg; t.className = "toast show" + (err ? " err" : "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.className = "toast"), 3200);
+}
+// Se il server e' protetto da token (HSH_API_TOKEN) lo chiede una volta e lo ricorda
+let apiToken = "";
+try { apiToken = localStorage.getItem("hsh_token") || ""; } catch {}
+async function api(path, body) {
+  const headers = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (apiToken) headers.Authorization = "Bearer " + apiToken;
+  const r = await fetch(path, body === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(body) });
+  if (r.status === 401 && !api.asking) {
+    api.asking = true;
+    const t = prompt("Questo server richiede il token API (HSH_API_TOKEN):");
+    api.asking = false;
+    if (t) { apiToken = t.trim(); try { localStorage.setItem("hsh_token", apiToken); } catch {} return api(path, body); }
+  }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(data.error || "Errore"), { data });
+  return data;
+}
+function showTab(name) {
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  for (const n of ["queue", "settings", "api"]) $("tab-" + n).hidden = name !== n;
+  if (name === "api") renderApiDocs();
+}
+document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+
+// ---------- impostazioni ----------
+function buildSelectorInputs(sel) {
+  $("selGrid").innerHTML = "";
+  for (const k of Object.keys(SEL_LABELS)) {
+    const l = document.createElement("label"); l.className = "f";
+    l.append(SEL_LABELS[k]);
+    const i = document.createElement("input"); i.type = "text"; i.id = "sel_" + k; i.value = sel[k] || ""; i.spellcheck = false;
+    l.append(i); $("selGrid").append(l);
+  }
+}
+function fillForm(s) {
+  $("name").value = s.name; $("email").value = s.email; $("comment").value = s.comment;
+  $("showBrowser").checked = s.showBrowser; $("autoStart").checked = !!s.autoStart;
+  $("pauseSec").value = Math.round(s.betweenTracksMs / 1000);
+  $("jitterSec").value = Math.round(s.betweenTracksJitterMs / 1000);
+  $("maxTracksPerRun").value = s.maxTracksPerRun;
+  $("browserChannel").value = s.browserChannel;
+  $("downloadDir").value = s.downloadDir;
+  buildSelectorInputs(s.sel);
+}
+function readForm() {
+  const sel = {};
+  for (const k of Object.keys(SEL_LABELS)) sel[k] = $("sel_" + k).value;
+  return {
+    name: $("name").value, email: $("email").value, comment: $("comment").value,
+    showBrowser: $("showBrowser").checked, autoStart: $("autoStart").checked,
+    betweenTracksMs: Number($("pauseSec").value) * 1000,
+    betweenTracksJitterMs: Number($("jitterSec").value) * 1000,
+    maxTracksPerRun: Number($("maxTracksPerRun").value),
+    browserChannel: $("browserChannel").value,
+    downloadDir: $("downloadDir").value, sel,
+  };
+}
+$("saveBtn").onclick = async () => {
+  try {
+    const r = await api("/api/settings", readForm());
+    fillForm(r.settings); toast("Impostazioni salvate"); $("saveNote").textContent = "Salvate alle " + new Date().toLocaleTimeString();
+    poll();
+  } catch (e) { toast(e.message, true); }
+};
+$("resetSel").onclick = async () => {
+  try { const r = await api("/api/settings/reset-selectors", {}); fillForm(r.settings); toast("Selettori ripristinati"); } catch (e) { toast(e.message, true); }
+};
+document.querySelectorAll("[data-login]").forEach((b) => (b.onclick = async () => {
+  b.disabled = true;
+  try {
+    const r = await api("/api/accounts/" + b.dataset.login + "/login", {});
+    if (r.remote) {
+      // server senza schermo (Docker): apro lo schermo remoto del server; password = HSH_VNC_PASSWORD
+      const u = location.protocol + "//" + location.hostname + ":" + r.remote.port + r.remote.path;
+      window.open(u, "_blank") || prompt("Apri questo indirizzo per accedere (password: HSH_VNC_PASSWORD):", u);
+      toast("Schermo remoto aperto: accedi, poi chiudi Chrome (la X della finestra)");
+    } else toast("Browser aperto: accedi e poi chiudi la finestra");
+  }
+  catch (e) { toast(e.message, true); }
+  b.disabled = false; poll();
+}));
+$("checkAcc").onclick = async () => {
+  $("checkNote").textContent = "Controllo in corso…";
+  try { await api("/api/accounts/check", {}); $("checkNote").textContent = ""; toast("Collegamenti aggiornati"); }
+  catch (e) { $("checkNote").textContent = ""; toast(e.message, true); }
+  poll();
+};
+$("saveEmail").onclick = () => $("saveBtn").click();
+
+// ---------- coda ----------
+function urlsFromBox() {
+  return $("list").value.split("\n").map((s) => s.trim()).filter((s) => /^https?:\/\/(www\.)?hypeddit\.com\//i.test(s));
+}
+function updateUrlCount() {
+  const n = new Set(urlsFromBox()).size;
+  $("urlCount").textContent = n ? n + " link validi" : "";
+  try { localStorage.setItem("hsh_urls", $("list").value); } catch {}
+}
+$("list").addEventListener("input", updateUrlCount);
+try { $("list").value = localStorage.getItem("hsh_urls") || ""; } catch {}
+updateUrlCount();
+
+$("start").onclick = async () => {
+  const urls = urlsFromBox();
+  if (!urls.length && !(status && status.pending && status.pending.length)) return toast("Incolla almeno un URL hypeddit.com valido", true);
+  $("start").disabled = true;
+  try {
+    const r = await api("/api/start", { urls, skipDone: $("skipDone").checked });
+    $("list").value = ""; updateUrlCount(); // i link ora sono nella coda del server
+    toast(`Avviate ${r.count} tracce` + (r.skipped ? ` (${r.skipped} già scaricate saltate)` : ""));
+  } catch (e) {
+    toast(e.message, true);
+    $("start").disabled = false;
+  }
+  poll();
+};
+$("stop").onclick = () => api("/api/stop", {}).then(poll);
+$("openDl").onclick = () => api("/api/open-downloads", {}).catch((e) => toast(e.message, true));
+$("clearHist").onclick = async () => {
+  if (!confirm("Azzerare la cronologia? Le tracce verranno riscaricate se le rimetti in coda.")) return;
+  try { await api("/api/clear-history", {}); poll(); } catch (e) { toast(e.message, true); }
+};
+$("requeue").onclick = () => {
+  const bad = Object.entries(status.history).filter(([, v]) => v.status !== "downloaded").map(([u]) => u);
+  if (!bad.length) return toast("Nessuna traccia da riaccodare");
+  const present = new Set(urlsFromBox());
+  const add = bad.filter((u) => !present.has(u));
+  $("list").value = ($("list").value.trim() + "\n" + add.join("\n")).trim() + "\n";
+  updateUrlCount(); toast(`Riaccodate ${bad.length} tracce`);
+};
+
+const LABEL = { downloaded: "scaricata", "no-download": "senza download", "needs-manual": "da fare a mano", stopped: "interrotta", error: "errore" };
+let lastHist = "";
+function renderHistory(h) {
+  const key = JSON.stringify(h); if (key === lastHist) return; lastHist = key;
+  const rows = Object.entries(h).sort((a, b) => (b[1].at || "").localeCompare(a[1].at || ""));
+  $("histEmpty").hidden = rows.length > 0; $("histTable").hidden = rows.length === 0;
+  const body = $("histBody"); body.innerHTML = "";
+  for (const [url, v] of rows) {
+    const tr = document.createElement("tr");
+    const td1 = document.createElement("td"); td1.className = "url"; td1.textContent = url.replace(/^https?:\/\/(www\.)?hypeddit\.com\//i, "");
+    const td2 = document.createElement("td"); const b = document.createElement("span");
+    b.className = "badge b-" + v.status; b.textContent = LABEL[v.status] || v.status; if (v.error) b.title = v.error; td2.append(b);
+    const td3 = document.createElement("td"); td3.textContent = v.file || v.reason || v.error || "—";
+    tr.append(td1, td2, td3); body.append(tr);
+  }
+}
+
+// ---------- polling ----------
+async function poll() {
+  try {
+    const s = (status = await api("/api/status"));
+    $("logs").textContent = s.logs.join("\n");
+    const lg = $("logs"); if (s.running) lg.scrollTop = lg.scrollHeight;
+    $("start").disabled = s.running;
+    $("stop").disabled = !s.running || s.stopping;
+    const extra = (s.failed.length ? ` · ${s.failed.length} senza download` : "") + (s.skipped.length ? ` · ${s.skipped.length} già scaricate` : "");
+    const total = s.queue.length, fin = s.done.length + s.failed.length;
+    const waiting = s.pending.length ? ` · ${s.pending.length} in coda` : "";
+    $("stat").textContent = s.alert ? "⚠ " + s.alert.message : s.running
+      ? `In corso — ${s.done.length}/${total} scaricate${extra}${waiting}` + (s.current ? ` · ${s.current}` : "")
+      : (s.pending.length ? `Ferma — ${s.pending.length} link in coda (premi Avvia)` + (total ? `; ultima esecuzione ${s.done.length}/${total} scaricate` : "")
+        : (total ? `Finito: ${s.done.length}/${total} scaricate${extra}` : "Pronto"));
+    $("barFill").style.width = total ? Math.round((fin / total) * 100) + "%" : "0";
+
+    // account
+    const label = { true: ["ok", "Collegato"], false: ["no", "Non collegato"], null: ["no", "Non verificato"] };
+    for (const k of ["soundcloud", "spotify", "instagram"]) {
+      const [cls, txt] = label[String(s.accounts[k])];
+      $("pill_" + k).className = "pill " + cls; $("pill_" + k).textContent = txt;
+    }
+    $("pill_email").className = "pill " + (s.emailSet ? "ok" : "no"); $("pill_email").textContent = s.emailSet ? "Impostata" : "Non impostata";
+    document.querySelectorAll("[data-login]").forEach((b) => {
+      const open = s.loginWindowOpen;
+      b.disabled = open || s.running; b.textContent = open ? "Finestra aperta…" : (s.accounts[b.dataset.login] ? "Cambia account" : "Accedi");
+    });
+    $("checkAcc").disabled = s.loginWindowOpen || s.running;
+    $("browserUsed").textContent = "· browser: " + s.browserUsed;
+    renderHistory(s.history);
+  } catch {}
+}
+
+// ---------- API: documentazione + prova dal vivo ----------
+const EX = "https://hypeddit.com/artista/traccia";
+const TOK = "IL_TUO_TOKEN";
+const BT = String.fromCharCode(96); // backtick (continuazione di riga in PowerShell)
+const ADD_RES = '{ "ok": true,\n  "added": ["' + EX + '"],\n  "duplicates": [], "alreadyDownloaded": [], "invalid": [],\n  "started": true, "running": true, "pending": 1 }';
+const REAL = "Avvia davvero la coda: fa azioni VERE (follow, like, repost, commenti) sui tuoi account social.";
+const API_GROUPS = [
+  { title: "Coda", items: [
+    { m: "POST", p: "/api/queue", t: "Aggiungi link alla coda",
+      d: "Aggiunge uno o più link. Funziona anche mentre la coda sta lavorando: il worker li prende da solo. Con \"start\": true (o con l'opzione «Avvia la coda da sola» nelle Impostazioni) la coda parte.",
+      params: [["urls", "array di testi", "Link hypeddit.com da aggiungere."], ["url", "testo", "Un solo link (alternativa a urls)."],
+        ["start", "true / false", "Avvia la coda dopo l'aggiunta. Default: false."], ["skipDone", "true / false", "Rifiuta le tracce già scaricate. Default: true."],
+        ["source", "testo", "Etichetta libera per sapere da dove arriva il link (es. \"telegram\"). Si vede in GET /api/queue."]],
+      body: { urls: [EX, EX + "-2"], start: false }, res: ADD_RES,
+      codes: "201 se almeno un link è stato aggiunto · 200 se erano tutti duplicati o già scaricati · 400 se nessun URL è valido",
+      danger: (b) => (b && b.start === true ? REAL : null) },
+    { m: "POST", p: "/api/queue", t: "Aggiungi link (testo semplice)",
+      d: "Comodo da script: il corpo è solo l'elenco dei link, uno per riga, con Content-Type: text/plain. Risposta e codici come sopra. Non avvia la coda (salvo l'opzione «Avvia da sola»).",
+      text: EX + "\n" + EX + "-2", res: ADD_RES, codes: "come sopra",
+      danger: () => null },
+    { m: "GET", p: "/api/queue", t: "Vedi la coda",
+      d: "Link in attesa, traccia in lavorazione ed esito dell'esecuzione in corso.",
+      res: '{ "running": true, "stopping": false,\n  "current": { "url": "…", "addedAt": "…", "source": "api" },\n  "pending": [ { "url": "…", "addedAt": "…", "source": "api" } ],\n  "count": 1, "autoStart": false,\n  "run": { "done": [], "failed": [] } }' },
+    { m: "DELETE", p: "/api/queue?url=" + encodeURIComponent(EX), t: "Togli un link dalla coda",
+      d: "Rimuove un solo link in attesa (l'URL va codificato). Non tocca la traccia in lavorazione.",
+      res: '{ "ok": true, "removed": 1, "running": false, "pending": 0 }', codes: "404 se il link non è in coda",
+      danger: () => "Toglie il link dalla coda." },
+    { m: "DELETE", p: "/api/queue", t: "Svuota la coda",
+      d: "Rimuove tutti i link in attesa. Non interrompe la traccia in lavorazione (per quello usa /api/queue/stop).",
+      res: '{ "ok": true, "removed": 3, "running": false, "pending": 0 }', danger: () => "Svuota TUTTA la coda." },
+    { m: "POST", p: "/api/queue/start", t: "Avvia la coda",
+      d: "Avvia l'elaborazione dei link in attesa, in sequenza e con pause «umane» tra una traccia e l'altra. Nel corpo puoi mandare anche degli urls (vengono aggiunti prima). Si ferma da sola quando la coda è vuota, al tetto di tracce per esecuzione o se un account risulta scaduto.",
+      params: [["urls", "array di testi", "Facoltativo: link da aggiungere prima di partire."], ["skipDone", "true / false", "Come sopra. Default: true."]],
+      body: {}, res: '{ "ok": true, "count": 2, "skipped": 0, "running": true, "pending": 1 }',
+      codes: "409 se è già in esecuzione · 400 se la coda è vuota", danger: () => REAL },
+    { m: "POST", p: "/api/queue/stop", t: "Ferma la coda",
+      d: "Si ferma alla fine dello step corrente. La traccia interrotta resta in testa alla coda e riparte al prossimo avvio.",
+      res: '{ "ok": true, "stopping": true, "running": true, "pending": 2 }', danger: () => "Ferma la coda in esecuzione." },
+    { m: "POST", p: "/api/queue/retry", t: "Riaccoda le non scaricate",
+      d: "Rimette in coda le tracce con quegli esiti (di default: da fare a mano, senza download, errore, interrotte).",
+      params: [["statuses", "array di testi", "Esiti da riprovare: needs-manual, no-download, error, stopped, downloaded."], ["start", "true / false", "Avvia dopo averle accodate. Default: false."]],
+      body: { statuses: ["needs-manual", "error"], start: false }, res: ADD_RES,
+      danger: (b) => (b && b.start === true ? REAL : "Rimette in coda le tracce non scaricate.") },
+  ] },
+  { title: "Stato, cronologia e log", items: [
+    { m: "GET", p: "/api/health", t: "Controllo rapido (senza token)", noAuth: true,
+      d: "Per un monitoraggio esterno: risponde sempre, anche senza token.", res: '{ "ok": true, "running": false, "pending": 0 }' },
+    { m: "GET", p: "/api/status", t: "Stato completo",
+      d: "Quello che usa questa interfaccia: stato, log recenti, coda, esiti, account, cronologia. Se un account è scaduto trovi qui l'avviso in \"alert\".",
+      res: '{ "running": true, "stopping": false, "current": "…", "pending": ["…"],\n  "done": [], "failed": [], "logs": ["[22:04] …"],\n  "alert": null,   // oppure { "type": "account-expired", "site": "soundcloud", "message": "…" }\n  "accounts": { "soundcloud": true, "spotify": true, "instagram": true },\n  "emailSet": true, "history": { … } }' },
+    { m: "GET", p: "/api/history?status=needs-manual,error", t: "Cronologia",
+      d: "Esito di ogni traccia elaborata, dalla più recente. Il filtro status è facoltativo.",
+      params: [["status (query)", "elenco separato da virgole", "downloaded, needs-manual, no-download, error, stopped."]],
+      res: '{ "count": 1, "items": [ { "url": "…", "status": "needs-manual", "reason": "step \\"fb\\" non automatizzabile", "file": null, "at": "2026-11-22T21:10:00Z" } ] }' },
+    { m: "GET", p: "/api/log?lines=50", t: "Ultime righe di log",
+      d: "Righe di log recenti (massimo 500). Il log completo è anche nel file data/log.txt.",
+      params: [["lines (query)", "numero", "Quante righe. Default 100."]], res: '{ "lines": ["[22:11:13] Scaricato ✓ …", "…"] }' },
+  ] },
+  { title: "Account", items: [
+    { m: "GET", p: "/api/accounts", t: "Stato degli account",
+      d: "Ultimo stato noto dei collegamenti. true = collegato, false = non collegato o scaduto, null = non verificato.",
+      res: '{ "accounts": { "soundcloud": true, "spotify": true, "instagram": false },\n  "checkedAt": "2026-11-22T21:00:00Z", "emailSet": true, "loginWindowOpen": false }' },
+    { m: "POST", p: "/api/accounts/check", t: "Verifica gli account (reale)",
+      d: "Apre i siti in headless e controlla che l'accesso sia davvero attivo (non solo che esista un cookie). Richiede circa 20 secondi.",
+      res: '{ "ok": true, "accounts": { "soundcloud": true, "spotify": true, "instagram": true } }',
+      codes: "409 se la coda sta lavorando", danger: () => "Apre i siti con il profilo dell'app per verificare l'accesso (circa 20 secondi)." },
+    { m: "POST", p: "/api/accounts/soundcloud/login", t: "Apri il login di un account",
+      d: "Sostituisci soundcloud con spotify o instagram. Apre un browser normale per accedere. In Docker risponde con { \"remote\": { \"port\": 6080, \"path\": \"/vnc.html?…\" } }: apri quella porta del server (password = HSH_VNC_PASSWORD).",
+      res: '{ "ok": true }', codes: "409 se la coda lavora o una finestra di login è già aperta",
+      danger: () => "Apre una finestra di login sul computer o sul server dove gira l'app." },
+  ] },
+  { title: "Impostazioni e file", items: [
+    { m: "GET", p: "/api/settings", t: "Leggi le impostazioni",
+      d: "Impostazioni correnti e valori predefiniti.", res: '{ "settings": { "name": "…", "comment": "support", "autoStart": false, … }, "defaults": { … } }' },
+    { m: "POST", p: "/api/settings", t: "Modifica le impostazioni",
+      d: "Manda solo i campi che vuoi cambiare; vengono validati e salvati in data/settings.json.",
+      params: [["name, email", "testo", "Per lo step email dei gate."], ["comment", "testo", "Commento lasciato su SoundCloud (vuoto = non commenta)."],
+        ["autoStart", "true / false", "Avvia la coda da sola quando arriva un link via API."], ["showBrowser", "true / false", "Mostra il browser (solo diagnostica)."],
+        ["betweenTracksMs", "numero", "Pausa tra le tracce, in millisecondi."], ["betweenTracksJitterMs", "numero", "Casualità aggiunta alla pausa."],
+        ["maxTracksPerRun", "numero", "Tetto di tracce per esecuzione (0 = nessuno). Le altre restano in coda."],
+        ["downloadDir", "testo", "Cartella dei download."], ["browserChannel", "testo", "auto, chrome, msedge o chromium."]],
+      body: { comment: "support", autoStart: false, maxTracksPerRun: 25 },
+      res: '{ "ok": true, "settings": { … } }', codes: "400 se un valore non è valido (con il motivo in \"error\")",
+      danger: () => "Modifica le impostazioni salvate dell'app." },
+    { m: "GET", p: "/api/downloads", t: "Elenco dei file scaricati",
+      d: "File presenti nella cartella dei download, dal più recente.",
+      res: '{ "dir": "/downloads", "count": 1, "files": [ { "name": "Traccia.zip", "bytes": 66900000, "modifiedAt": "2026-11-22T21:00:00Z" } ] }' },
+    { m: "GET", p: "/api/downloads/NOME-FILE.zip", t: "Scarica un file", file: true,
+      d: "Scarica un file della cartella dei download (usa il nome esatto di /api/downloads, codificato se ha spazi).", codes: "404 se il file non esiste" },
+  ] },
+];
+
+function psLit(v) {
+  if (typeof v === "string") return "'" + v.replace(/'/g, "''") + "'";
+  if (typeof v === "boolean") return v ? "$true" : "$false";
+  if (typeof v === "number") return String(v);
+  if (v === null) return "$null";
+  if (Array.isArray(v)) return "@(" + v.map(psLit).join(", ") + ")";
+  return "@{ " + Object.entries(v).map(([k, x]) => k + " = " + psLit(x)).join("; ") + " }";
+}
+function cmdFor(ep, style) {
+  const url = location.origin + ep.p;
+  const auth = !ep.noAuth;
+  const fname = ep.p.split("/").pop();
+  if (style === "curl") {
+    const L = ["curl" + (ep.m === "GET" ? "" : " -X " + ep.m) + ' "' + url + '"'];
+    if (auth) L.push('-H "Authorization: Bearer ' + TOK + '"');
+    if (ep.text !== undefined) L.push('-H "Content-Type: text/plain"', "--data-binary $'" + ep.text.replace(/\n/g, "\\n") + "'");
+    else if (ep.body !== undefined) L.push('-H "Content-Type: application/json"', "-d '" + JSON.stringify(ep.body) + "'");
+    if (ep.file) L.push('-o "' + fname + '"');
+    return L.join(" \\\n  ");
+  }
+  const verb = ep.m[0] + ep.m.slice(1).toLowerCase();
+  const L = [(ep.file ? "Invoke-WebRequest" : "Invoke-RestMethod") + " -Method " + verb + " -Uri '" + url + "'"];
+  if (auth) L.push("-Headers @{ Authorization = 'Bearer " + TOK + "' }");
+  if (ep.text !== undefined) L.push("-ContentType 'text/plain' -Body (@(" + ep.text.split("\n").map(psLit).join(", ") + ') -join "' + BT + 'n")');
+  else if (ep.body !== undefined) L.push("-ContentType 'application/json' -Body (" + psLit(ep.body) + " | ConvertTo-Json)");
+  if (ep.file) L.push("-OutFile '" + fname + "'");
+  return L.join(" " + BT + "\n  ");
+}
+function copyText(text) {
+  const done = () => toast("Copiato");
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).then(done, () => toast("Copia non riuscita", true));
+  const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.append(ta); ta.select();
+  try { document.execCommand("copy"); done(); } catch { toast("Copia non riuscita", true); }
+  ta.remove();
+}
+async function tryCall(ep, path, bodyText) {
+  const headers = {};
+  const init = { method: ep.m, headers };
+  if (ep.text !== undefined || ep.body !== undefined) { headers["Content-Type"] = ep.text !== undefined ? "text/plain" : "application/json"; init.body = bodyText; }
+  const go = () => { if (apiToken && !ep.noAuth) headers.Authorization = "Bearer " + apiToken; return fetch(path, init); };
+  let r = await go();
+  if (r.status === 401 && !api.asking) {
+    api.asking = true;
+    const t = prompt("Questo server richiede il token API (HSH_API_TOKEN):");
+    api.asking = false;
+    if (t) { apiToken = t.trim(); try { localStorage.setItem("hsh_token", apiToken); } catch {} r = await go(); }
+  }
+  const ct = r.headers.get("content-type") || "";
+  let out;
+  if (/json/.test(ct)) { const raw = await r.text(); try { out = JSON.stringify(JSON.parse(raw), null, 2); } catch { out = raw; } }
+  else if (/text|html/.test(ct)) out = await r.text();
+  else out = "(file di " + (await r.blob()).size + " byte)";
+  return "HTTP " + r.status + " " + r.statusText + "\n\n" + out;
+}
+
+const apiCmds = []; // { pre, ep } per ri-generare gli esempi al cambio di stile
+function codeBox(text, ep) {
+  const box = document.createElement("div"); box.className = "codebox";
+  const pre = document.createElement("pre"); pre.textContent = text;
+  const b = document.createElement("button"); b.className = "cp"; b.type = "button"; b.textContent = "Copia";
+  b.onclick = () => copyText(pre.textContent);
+  box.append(pre, b);
+  if (ep) apiCmds.push({ pre, ep });
+  return box;
+}
+function h4(t) { const h = document.createElement("h4"); h.textContent = t; return h; }
+function buildEndpoint(ep) {
+  const det = document.createElement("details"); det.className = "ep";
+  const sum = document.createElement("summary");
+  const mb = document.createElement("span"); mb.className = "meth m-" + ep.m; mb.textContent = ep.m;
+  const ph = document.createElement("span"); ph.className = "pth"; ph.textContent = ep.p.length > 46 ? ep.p.slice(0, 46) + "…" : ep.p;
+  const tt = document.createElement("span"); tt.className = "ttl"; tt.textContent = ep.t;
+  sum.append(mb, ph, tt);
+  const body = document.createElement("div"); body.className = "epb";
+  const p = document.createElement("p"); p.textContent = ep.d; body.append(p);
+  if (ep.noAuth) { const n = document.createElement("p"); n.className = "hint"; n.textContent = "Non richiede il token."; body.append(n); }
+  if (ep.params) {
+    body.append(h4("Parametri"));
+    const t = document.createElement("table");
+    for (const [n, ty, ds] of ep.params) {
+      const tr = document.createElement("tr");
+      const a = document.createElement("td"), c = document.createElement("td");
+      const code = document.createElement("code"); code.textContent = n;
+      const tyEl = document.createElement("div"); tyEl.className = "ty"; tyEl.textContent = ty;
+      a.append(code, tyEl); c.textContent = ds; tr.append(a, c); t.append(tr);
+    }
+    body.append(t);
+  }
+  body.append(h4("Esempio"), codeBox("", ep));
+  if (ep.res) body.append(h4("Risposta d'esempio"), codeBox(ep.res));
+  if (ep.codes) { const c = document.createElement("p"); c.className = "hint"; c.style.marginTop = "8px"; c.textContent = "Codici: " + ep.codes; body.append(c); }
+
+  // prova dal vivo
+  const tr = document.createElement("div"); tr.className = "try";
+  tr.append(h4("Prova da qui"));
+  const pin = document.createElement("input"); pin.type = "text"; pin.value = ep.p; pin.spellcheck = false; tr.append(pin);
+  let ta = null;
+  if (ep.body !== undefined || ep.text !== undefined) {
+    ta = document.createElement("textarea"); ta.spellcheck = false;
+    ta.value = ep.text !== undefined ? ep.text : JSON.stringify(ep.body, null, 2);
+    ta.style.marginTop = "8px"; tr.append(ta);
+  }
+  const row = document.createElement("div"); row.className = "row";
+  const go = document.createElement("button"); go.className = "btn sec"; go.type = "button"; go.textContent = "▶ Esegui";
+  row.append(go); tr.append(row);
+  const out = codeBox("");
+  out.hidden = true; tr.append(out);
+  go.onclick = async () => {
+    let parsed = null;
+    if (ta && ep.text === undefined) { try { parsed = JSON.parse(ta.value || "{}"); } catch { return toast("Il corpo non è un JSON valido", true); } }
+    const warn = ep.danger ? ep.danger(parsed) : null;
+    if (warn && !confirm(warn + "\n\nProcedo?")) return;
+    go.disabled = true;
+    try { out.firstChild.textContent = await tryCall(ep, pin.value, ta ? ta.value : undefined); }
+    catch (e) { out.firstChild.textContent = "Errore di rete: " + e.message; }
+    out.hidden = false; go.disabled = false; poll();
+  };
+  body.append(tr);
+  det.append(sum, body);
+  return det;
+}
+
+function apiStyle() { return $("apiStyle").value; }
+function refreshApiCmds() { for (const { pre, ep } of apiCmds) pre.textContent = cmdFor(ep, apiStyle()); }
+async function loadApiAuth() {
+  const el = $("apiAuth");
+  try {
+    const r = await fetch("/api", { headers: apiToken ? { Authorization: "Bearer " + apiToken } : {} });
+    if (r.status === 401) el.textContent = "🔒 Il server richiede un token: inseriscilo qui sotto per usare i pulsanti «Esegui».";
+    else if (r.ok) {
+      const j = await r.json();
+      el.textContent = /^nessuna/i.test(j.auth || "") ? "🔓 Nessun token richiesto: l'app risponde solo a localhost." : "🔒 Il server richiede un token (quello salvato in questo browser funziona).";
+    } else el.textContent = "Non riesco a leggere lo stato dell'autenticazione (HTTP " + r.status + ").";
+  } catch { el.textContent = "Server non raggiungibile."; }
+}
+let apiBuilt = false;
+function renderApiDocs() {
+  $("apiBase").textContent = location.origin;
+  loadApiAuth();
+  if (apiBuilt) return;
+  apiBuilt = true;
+  let st = ""; try { st = localStorage.getItem("hsh_apistyle") || ""; } catch {}
+  $("apiStyle").value = st || (/Windows/i.test(navigator.userAgent) ? "ps" : "curl");
+  $("apiStyle").onchange = () => { try { localStorage.setItem("hsh_apistyle", apiStyle()); } catch {} refreshApiCmds(); };
+  document.querySelector('[data-copy="base"]').onclick = () => copyText(location.origin);
+  $("apiTokSave").onclick = () => {
+    apiToken = $("apiTok").value.trim(); $("apiTok").value = "";
+    try { localStorage.setItem("hsh_token", apiToken); } catch {}
+    toast(apiToken ? "Token salvato in questo browser" : "Token rimosso"); loadApiAuth();
+  };
+  if (apiToken) $("apiTok").placeholder = "Token salvato — scrivine uno nuovo per sostituirlo (vuoto + Salva = rimuovi)";
+  const host = $("apiGroups");
+  for (const g of API_GROUPS) {
+    const h = document.createElement("div"); h.className = "apig"; h.textContent = g.title; host.append(h);
+    for (const ep of g.items) host.append(buildEndpoint(ep));
+  }
+  refreshApiCmds();
+}
+
+(async () => {
+  try { const r = await api("/api/settings"); fillForm(r.settings); } catch {}
+  await poll(); setInterval(poll, 1000);
+})();
+</script>
+</body>
+</html>

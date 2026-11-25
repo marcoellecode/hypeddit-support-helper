@@ -1,0 +1,41 @@
+name: Pacchetto per Windows (Release)
+
+# Quando pubblichi un tag di versione (es. v0.2.0) crea una Release con lo zip da scaricare,
+# estrarre e avviare con avvia.cmd (Node.js richiesto). L'immagine Docker la pubblica docker.yml.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    name: Zip scaricabile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Crea lo zip (solo i file dell'app, nessun dato personale)
+        run: |
+          git archive --format=zip --prefix=hypeddit-support-helper/ \
+            -o hypeddit-support-helper-windows.zip HEAD
+      - name: Pubblica la Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: hypeddit-support-helper-windows.zip
+          generate_release_notes: true
+          body: |
+            ## Come usarlo su Windows
+            1. Scarica **hypeddit-support-helper-windows.zip** qui sotto ed estrailo.
+            2. Installa [Node.js](https://nodejs.org) LTS (20 o superiore) e Google Chrome o Microsoft Edge.
+            3. Doppio clic su `avvia.cmd`: al primo avvio installa le dipendenze e apre l'interfaccia.
+
+            ## Su un server con Docker
+            `docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}` (vedi DOCKER.md).
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: hypeddit-support-helper-windows
+          path: hypeddit-support-helper-windows.zip

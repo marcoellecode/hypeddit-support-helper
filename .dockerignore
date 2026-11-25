@@ -1,0 +1,9 @@
+node_modules
+user-profile
+data
+downloads
+.git
+.env
+*.cmd
+init-profile.js
+npm-debug.log

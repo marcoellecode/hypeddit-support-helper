@@ -1,0 +1,14 @@
+# dipendenze
+node_modules/
+
+# DATI PERSONALI: login dei browser, coda, cronologia, impostazioni, download
+user-profile/
+data/
+downloads/
+.env
+
+# pacchetti e residui locali
+*.zip
+*.log
+.DS_Store
+Thumbs.db
