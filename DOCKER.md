@@ -16,13 +16,13 @@ Un solo contenitore, `hypeddit-support-helper`:
 ## Installazione con Docker Compose (server con terminale)
 ```bash
 mkdir hypeddit-support-helper && cd hypeddit-support-helper
-curl -LO https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.yml
+curl -LO https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.linux.yml
 mkdir -p data downloads && sudo chown 1000:1000 data downloads
-docker compose up -d
+docker compose -f docker-compose.linux.yml up -d
 ```
 Poi apri `http://<IP-del-server>:5178`.
 
-- Porta occupata? Apri `docker-compose.yml` e cambia il numero **a sinistra** in `ports:` (es. `"8178:5178"`).
+- Porta occupata? Apri `docker-compose.linux.yml` e cambia il numero **a sinistra** in `ports:` (es. `"8178:5178"`).
 - Token, webhook e fuso orario si cambiano nello stesso file, sotto `environment:` (tutto facoltativo).
 - Se l'immagine risulta privata (`pull access denied`): su GitHub, *Packages → hypeddit-support-helper →
   Package settings → Change visibility → Public*.
@@ -30,19 +30,17 @@ Poi apri `http://<IP-del-server>:5178`.
   `docker build -t ghcr.io/marcoellecode/hypeddit-support-helper:latest .` e `docker compose up -d`.
 
 ## ZimaOS / CasaOS
-> **Usa il file della cartella `Apps`, non quello della radice del repository.** Il `docker-compose.yml`
-> della radice è per Docker Compose da terminale: CasaOS non interpreta quel formato e mostra porta e
-> volumi sbagliati.
+Il file **`docker-compose.yml`** (quello della radice del repository) è già adattato a CasaOS: nome, descrizione,
+icona, porta e dati in AppData. Indirizzo da importare:
 
-Il file giusto è
-[`Apps/HypedditSupportHelper/docker-compose.yml`](Apps/HypedditSupportHelper/docker-compose.yml), già adattato a
-CasaOS (nome, descrizioni, icona, porta e cartelle):
+`https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.yml`
 
-`https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/Apps/HypedditSupportHelper/docker-compose.yml`
+> Per un server Linux **generico** (non CasaOS) esiste `docker-compose.linux.yml`, con cartelle `./data` e
+> `./downloads`. Non usarlo su ZimaOS/CasaOS: non sa interpretare quel formato.
 
 **Metodo 1 — installazione personalizzata (il più semplice)**
 1. *App Store → Installazione personalizzata (Custom Install)*.
-2. Importa il file con l'indirizzo qui sopra (o incolla il contenuto del file).
+2. Importa il file con l'indirizzo qui sopra (o incolla il contenuto del file). Quello in `Apps/` è identico.
 3. Controlla che nel modulo ci siano porta **5178 → 5178** e i volumi `/data` e `/downloads` su
    `/DATA/AppData/hypeddit-support-helper/data` e `.../downloads` (come le altre app), poi **Installa**.
    Non c'è altro da cambiare; i download li vedi dall'app *File*, dentro `AppData/hypeddit-support-helper/downloads`.

@@ -126,16 +126,16 @@ Registry. **Solo x86-64**: Google Chrome per Linux non esiste per ARM. **Non ser
 
 ```bash
 mkdir hypeddit-support-helper && cd hypeddit-support-helper
-curl -LO https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.yml
+curl -LO https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.linux.yml
 mkdir -p data downloads && sudo chown 1000:1000 data downloads
-docker compose up -d
+docker compose -f docker-compose.linux.yml up -d
 ```
 Poi apri `http://<IP-del-server>:5178`.
 
-- **ZimaOS / CasaOS:** NON usare il compose della radice. C'è un pacchetto pronto, con icona e descrizione, in
-  [`Apps/HypedditSupportHelper`](Apps/HypedditSupportHelper/docker-compose.yml): importalo in
-  *Installazione personalizzata* oppure aggiungi il repository come App Store di terze parti
-  (dettagli in [DOCKER.md](DOCKER.md#zimaos--casaos)).
+- **ZimaOS / CasaOS:** importa in *Installazione personalizzata* il file `docker-compose.yml` della radice
+  (già adattato: nome, icona, porta, dati in AppData), oppure aggiungi il repository come App Store di terze
+  parti. `docker-compose.linux.yml` è invece per un server Linux generico (dettagli in
+  [DOCKER.md](DOCKER.md#zimaos--casaos)).
 - Il login degli account avviene da uno **schermo remoto aperto nel browser**, sulla stessa porta dell'app.
 - Tutti i dettagli (porta diversa, primo accesso agli account, sicurezza, aggiornamenti, problemi):
   **[DOCKER.md](DOCKER.md)**.
@@ -228,7 +228,8 @@ scheda **API** dell'interfaccia; il riferimento testuale è in **[API.md](API.md
 | `automate.js` | Logica Playwright: gate, azioni social, verifica degli account, login remoto |
 | `settings.js`, `config.js` | Impostazioni, validazione e valori predefiniti |
 | `public/index.html` | Interfaccia (Coda, Impostazioni, API) |
-| `Dockerfile`, `docker-compose.yml` | Immagine e compose |
+| `Dockerfile`, `docker-compose.yml` | Immagine e compose per ZimaOS / CasaOS |
+| `docker-compose.linux.yml` | Compose per un server Linux generico |
 | `Apps/HypedditSupportHelper/` | Pacchetto per ZimaOS / CasaOS (compose con metadati e icona) |
 | `.github/workflows/docker.yml` | Controlli e pubblicazione dell'immagine su ghcr.io |
 | `avvia.cmd` | Avvio con un doppio clic su Windows |
