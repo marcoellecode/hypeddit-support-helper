@@ -1,57 +1,55 @@
-# Pacchetto per ZimaOS / CasaOS.
-#  - Installazione personalizzata: App Store -> "Installazione personalizzata" -> incolla/importa QUESTO file.
-#  - App Store di terze parti: aggiungi come sorgente
-#      https://github.com/marcoellecode/hypeddit-support-helper/archive/refs/heads/main.zip
-#    (l'app compare con icona e descrizione). Guida: DOCKER.md, sezione "ZimaOS".
-# Non serve configurare nulla: installa, apri l'app, vai in Impostazioni e collega gli account.
+# Hypeddit Support Helper per ZimaOS / CasaOS.
+# Come installarlo: App Store -> "Installazione personalizzata" -> importa questo file.
+# Oppure aggiungi come sorgente App Store:
+#   https://github.com/marcoellecode/hypeddit-support-helper/archive/refs/heads/main.zip
+# Non serve cambiare niente: installa, apri l'app e collega gli account da Impostazioni.
+# I dati stanno in /DATA/AppData/hypeddit-support-helper (come le altre app).
 name: hypeddit-support-helper
 services:
   hypeddit-support-helper:
     image: ghcr.io/marcoellecode/hypeddit-support-helper:latest
     container_name: hypeddit-support-helper
-    hostname: hypeddit-support-helper
     restart: unless-stopped
-    shm_size: "1gb"
-    user: "0:0"                # le cartelle /DATA di ZimaOS sono di root: evita problemi di permessi
+    user: "0:0"
+    network_mode: bridge
+    privileged: false
+    cpu_shares: 90
+    command: []
+    cap_add: []
+    devices: []
     environment:
-      TZ: Europe/Rome
-      HSH_API_TOKEN: ""        # facoltativo: protegge cruscotto e API (lascia vuoto su rete di casa)
-      HSH_WEBHOOK_URL: ""      # facoltativo: avvisi per "account scaduto" e "coda finita"
+      - TZ=Europe/Rome
     ports:
       - target: 5178
-        published: "5178"      # cambia il numero se la 5178 e' occupata: tutto passa da questa porta
+        published: "5178"
         protocol: tcp
     volumes:
       - type: bind
         source: /DATA/AppData/hypeddit-support-helper/data
         target: /data
       - type: bind
-        source: /DATA/Downloads/Hypeddit
+        source: /DATA/AppData/hypeddit-support-helper/downloads
         target: /downloads
     x-casaos:
       envs:
-        - container: HSH_API_TOKEN
+        - container: TZ
           description:
-            en_us: "Optional. Protects the dashboard and API from other devices on the network. Leave empty on a trusted home network."
-            it_it: "Facoltativo. Protegge cruscotto e API da altri dispositivi della rete. Lascia vuoto su una rete di casa fidata."
-        - container: HSH_WEBHOOK_URL
-          description:
-            en_us: "Optional. URL that receives a JSON POST when an account expires or the queue finishes."
-            it_it: "Facoltativo. URL che riceve un POST JSON quando un account scade o la coda finisce."
+            en_us: Time zone
+            it_it: Fuso orario
       ports:
         - container: "5178"
           description:
-            en_us: "Web interface and API (the remote login screen also uses this port)"
-            it_it: "Interfaccia web e API (anche lo schermo remoto del login usa questa porta)"
+            en_us: Web interface and API (the remote login screen uses this port too)
+            it_it: Interfaccia web e API (anche lo schermo remoto del login usa questa porta)
       volumes:
         - container: /data
           description:
-            en_us: "Browser profile (logins), queue, history and settings. Treat it like a password."
-            it_it: "Profilo del browser (login), coda, cronologia e impostazioni. Trattalo come una password."
+            en_us: Browser profile (logins), queue, history and settings. Treat it like a password.
+            it_it: Profilo del browser (login), coda, cronologia e impostazioni. Trattalo come una password.
         - container: /downloads
           description:
-            en_us: "Downloaded files"
-            it_it: "File scaricati"
+            en_us: Downloaded files
+            it_it: File scaricati
 x-casaos:
   architectures:
     - amd64

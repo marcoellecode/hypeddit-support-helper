@@ -113,6 +113,9 @@ async function launchContext({ headless }, log) {
     ...(headless ? { viewport: { width: 1280, height: 900 } } : { viewport: null, args: ["--start-maximized"] }),
   }
   if (channel !== "chromium") opts.channel = channel
+  // In Docker /dev/shm e' piccola (64 MB) e Chrome crasha: uso /tmp, cosi' non serve shm_size nel compose
+  // (CasaOS/ZimaOS non lo gestisce).
+  if (process.env.HSH_DOCKER === "1") opts.args = [...(opts.args || []), "--disable-dev-shm-usage"]
   try {
     return await chromium.launchPersistentContext(profileDir, opts)
   } catch (e) {

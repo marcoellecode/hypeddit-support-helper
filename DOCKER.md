@@ -43,9 +43,10 @@ CasaOS (nome, descrizioni, icona, porta e cartelle):
 **Metodo 1 — installazione personalizzata (il più semplice)**
 1. *App Store → Installazione personalizzata (Custom Install)*.
 2. Importa il file con l'indirizzo qui sopra (o incolla il contenuto del file).
-3. Controlla che nel modulo ci siano porta **5178 → 5178**, volume `/data` su
-   `/DATA/AppData/hypeddit-support-helper/data` e `/downloads` su `/DATA/Downloads/Hypeddit`, poi **Installa**.
-   Non c'è altro da cambiare; i download li vedi dall'app *File*.
+3. Controlla che nel modulo ci siano porta **5178 → 5178** e i volumi `/data` e `/downloads` su
+   `/DATA/AppData/hypeddit-support-helper/data` e `.../downloads` (come le altre app), poi **Installa**.
+   Non c'è altro da cambiare; i download li vedi dall'app *File*, dentro `AppData/hypeddit-support-helper/downloads`.
+   Per proteggere l'app con un token (facoltativo) aggiungi la variabile `HSH_API_TOKEN` dalle impostazioni dell'app.
 
 **Metodo 2 — come App Store di terze parti**
 *App Store → ⚙ → aggiungi sorgente* e inserisci
