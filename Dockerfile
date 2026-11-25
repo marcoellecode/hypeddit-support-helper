@@ -42,7 +42,7 @@ RUN mkdir -p /data /downloads /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix \
 USER node
 
 VOLUME ["/data", "/downloads"]
-EXPOSE 5178 6080
+EXPOSE 5178
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fs "http://127.0.0.1:${HSH_PORT}/api/health" || exit 1

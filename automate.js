@@ -4,6 +4,7 @@
 // e la sequenza.
 import path from "path"
 import fs from "fs"
+import crypto from "crypto"
 import { spawn } from "child_process"
 import { fileURLToPath } from "url"
 import { chromium } from "playwright"
@@ -137,12 +138,23 @@ export const LOGIN_URLS = {
 }
 
 // --- schermo remoto (solo con HSH_REMOTE_LOGIN=1): Xvfb + x11vnc + noVNC ---
+// noVNC non viene esposto con una porta propria: server.js lo ripropone sotto /novnc sulla
+// STESSA porta dell'app, quindi funziona con qualunque porta host scelta nel compose.
 let remoteProcs = []
+let remotePw = "" // password VNC di questa sessione: casuale, salvo HSH_VNC_PASSWORD
+let remotePwAuto = false
 const vncPassFile = "/tmp/hsh-vncpass"
+export const remoteLoginActive = () => REMOTE_LOGIN && remoteProcs.length > 0
+export const novncPort = () => NOVNC_PORT
+
+function remoteInfo() {
+  const q = "autoconnect=true&resize=scale&path=novnc/websockify" + (remotePwAuto ? "&password=" + encodeURIComponent(remotePw) : "")
+  return { remote: { path: "/novnc/vnc.html?" + q, passwordAuto: remotePwAuto } }
+}
 
 async function startRemoteDesktop(log) {
-  const pw = process.env.HSH_VNC_PASSWORD || ""
-  if (pw.length < 8) throw new Error("Per il login remoto imposta HSH_VNC_PASSWORD (almeno 8 caratteri).")
+  remotePwAuto = !process.env.HSH_VNC_PASSWORD
+  remotePw = process.env.HSH_VNC_PASSWORD || crypto.randomBytes(9).toString("base64url").slice(0, 8)
   const display = ":99"
   const env = { ...process.env, DISPLAY: display }
   const run = (cmd, args, name) => {
@@ -155,9 +167,9 @@ async function startRemoteDesktop(log) {
   for (let i = 0; i < 50 && !fs.existsSync("/tmp/.X11-unix/X99"); i++) await sleep(100)
   run("fluxbox", [], "fluxbox") // gestore finestre minimo (focus e ridimensionamento)
   // password VNC (il protocollo ne usa solo i primi 8 caratteri), salvata in un file privato
-  await new Promise((res) => spawn("x11vnc", ["-storepasswd", pw, vncPassFile], { stdio: "ignore" }).on("exit", res).on("error", res))
+  await new Promise((res) => spawn("x11vnc", ["-storepasswd", remotePw, vncPassFile], { stdio: "ignore" }).on("exit", res).on("error", res))
   try { fs.chmodSync(vncPassFile, 0o600) } catch {}
-  // x11vnc ascolta solo dentro il container; noVNC (websockify) e' l'unica porta esposta
+  // x11vnc ascolta solo dentro il container; websockify solo su localhost (lo ripropone server.js)
   run("x11vnc", ["-display", display, "-rfbport", "5900", "-localhost", "-forever", "-shared", "-noxdamage", "-rfbauth", vncPassFile], "x11vnc")
   run("websockify", ["--web", "/usr/share/novnc", String(NOVNC_PORT), "localhost:5900"], "noVNC")
   await sleep(1200)
@@ -169,15 +181,31 @@ function stopRemoteDesktop() {
     try { p.kill("SIGTERM") } catch {}
   }
   remoteProcs = []
+  remotePw = ""
   try { fs.rmSync(vncPassFile, { force: true }) } catch {}
 }
 
 let loginStarting = false
-// Ritorna { remote?: { port, path } }: con il login remoto indica dove aprire lo schermo.
+let loginSite = null // sito per cui la finestra di login e' aperta
+let loginOnClosed = null
+export const loginSiteOpen = () => loginSite
+
+// argomenti di un browser NORMALE: nessun flag di automazione (Google lo rifiuterebbe altrimenti)
+function loginArgs(url) {
+  const a = [`--user-data-dir=${profileDir}`, "--no-first-run", "--no-default-browser-check"]
+  if (REMOTE_LOGIN) {
+    a.push("--lang=" + (process.env.HSH_LOCALE || "it-IT"), "--no-sandbox", "--password-store=basic", "--disable-dev-shm-usage", "--window-position=0,0", "--window-size=1366,850")
+  }
+  a.push(url)
+  return a
+}
+
+// Apre il login. Se una finestra e' gia' aperta NON da' errore: la "riapre" (schermo remoto di
+// nuovo disponibile, oppure una nuova scheda/finestra sul sito richiesto).
+// Ritorna { remote?: { path }, reopened?: true }.
 export async function openLoginWindow(site, log, onClosed) {
   const url = LOGIN_URLS[site]
   if (!url) throw new Error("Account sconosciuto")
-  if (loginChild || loginStarting) throw new Error("Una finestra di login e' gia' aperta: usala o chiudila.")
   const channel = resolveChannel()
   const exe = findExe(channel)
   if (!exe) {
@@ -185,45 +213,77 @@ export async function openLoginWindow(site, log, onClosed) {
       "Per accedere (soprattutto con Google) serve Google Chrome o Microsoft Edge installato: non li trovo."
     )
   }
+  if (loginStarting) throw new Error("Il login si sta aprendo: riprova tra un attimo.")
+  if (loginChild) {
+    // stesso profilo: il browser gia' aperto riceve l'indirizzo e mostra una nuova scheda
+    const env = REMOTE_LOGIN ? { ...process.env, DISPLAY: ":99" } : process.env
+    spawn(exe, loginArgs(url), { detached: !REMOTE_LOGIN, stdio: "ignore", env }).on("error", () => {}).unref()
+    loginSite = site
+    onClosed && (loginOnClosed = onClosed)
+    log(`Login gia' aperto: lo riapro su ${site}`)
+    return REMOTE_LOGIN ? { ...remoteInfo(), reopened: true } : { reopened: true }
+  }
   loginStarting = true
   try {
     await closeBrowser() // libera il profilo
     fs.mkdirSync(profileDir, { recursive: true })
     cleanStaleProfileLocks()
-    let env = process.env
-    const args = [`--user-data-dir=${profileDir}`, "--no-first-run", "--no-default-browser-check"]
-    if (REMOTE_LOGIN) {
-      env = await startRemoteDesktop(log)
-      args.push("--lang=" + (process.env.HSH_LOCALE || "it-IT"), "--no-sandbox", "--password-store=basic", "--disable-dev-shm-usage", "--window-position=0,0", "--window-size=1366,850")
-    }
-    args.push(url)
-    // browser NORMALE: nessun flag di automazione (Google lo rifiuterebbe altrimenti)
-    const child = spawn(exe, args, { detached: !REMOTE_LOGIN, stdio: "ignore", env })
+    const env = REMOTE_LOGIN ? await startRemoteDesktop(log) : process.env
+    const child = spawn(exe, loginArgs(url), { detached: !REMOTE_LOGIN, stdio: "ignore", env })
     loginChild = child
-    child.on("error", (e) => {
+    loginSite = site
+    loginOnClosed = onClosed || null
+    const finished = (msg) => {
+      if (loginChild !== child) return
       loginChild = null
+      loginSite = null
       stopRemoteDesktop()
-      log(`Impossibile aprire ${CHANNEL_LABEL[channel]}: ${e.message}`)
-    })
-    child.on("exit", () => {
-      loginChild = null
-      stopRemoteDesktop()
-      log("Finestra di login chiusa")
-      onClosed && setTimeout(onClosed, 1500)
-    })
+      log(msg)
+      const cb = loginOnClosed
+      loginOnClosed = null
+      cb && setTimeout(cb, 1500)
+    }
+    child.on("error", (e) => finished(`Impossibile aprire ${CHANNEL_LABEL[channel]}: ${e.message}`))
+    child.on("exit", () => finished("Finestra di login chiusa"))
     if (!REMOTE_LOGIN) child.unref()
     log(
       REMOTE_LOGIN
-        ? `Login remoto pronto (${site}): apri la porta ${NOVNC_PORT} del server, accedi e chiudi Chrome.`
+        ? `Login remoto pronto (${site}): si apre lo schermo del server nel browser. Accedi, poi chiudi Chrome (o premi «Chiudi login»).`
         : `Aperto ${CHANNEL_LABEL[channel]} per il login (${site}). Accedi, poi chiudi la finestra.`
     )
-    return REMOTE_LOGIN ? { remote: { port: NOVNC_PORT, path: "/vnc.html?autoconnect=true&resize=scale" } } : {}
+    return REMOTE_LOGIN ? remoteInfo() : {}
   } catch (e) {
     stopRemoteDesktop()
     throw e
   } finally {
     loginStarting = false
   }
+}
+
+// Chiude il login (anche se la finestra e' "rimasta aperta"): termina il browser e lo schermo
+// remoto e fa ripartire la verifica degli account. Ritorna false se non c'era nulla da chiudere.
+export function closeLoginWindow(log) {
+  const c = loginChild
+  if (!c && !remoteProcs.length) return false
+  if (c) {
+    try {
+      if (process.platform === "win32") spawn("taskkill", ["/PID", String(c.pid), "/T", "/F"], { stdio: "ignore" })
+      else c.kill("SIGTERM")
+    } catch {}
+  }
+  stopRemoteDesktop()
+  // se l'evento "exit" non arriva, non resto bloccato
+  setTimeout(() => {
+    if (c && loginChild === c) {
+      loginChild = null
+      loginSite = null
+      log && log("Finestra di login chiusa")
+      const cb = loginOnClosed
+      loginOnClosed = null
+      cb && cb()
+    }
+  }, 3000)
+  return true
 }
 
 // Controlla dai cookie del profilo quali account risultano collegati.

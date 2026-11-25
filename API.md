@@ -14,9 +14,10 @@ Base: `http://127.0.0.1:5178`. L'elenco aggiornato degli endpoint è anche su `G
     (`autoStart`, in Impostazioni).
 - **Tetto** `maxTracksPerRun`: oltre il tetto i link restano in coda; si riparte con un nuovo avvio.
 - Le tracce già scaricate vengono rifiutate (`alreadyDownloaded`) salvo `"skipDone": false`.
-- **Sicurezza:** ascolta solo su `127.0.0.1`. Se imposti la variabile d'ambiente `HSH_API_TOKEN`,
-  ogni `/api/*` (tranne `/api/health`) richiede `Authorization: Bearer <token>` oppure
-  `X-API-Key: <token>`. L'interfaccia grafica chiede il token una volta.
+- **Sicurezza:** il token è **facoltativo**. Senza `HSH_API_TOKEN` l'API non chiede nulla (su PC ascolta
+  solo su `127.0.0.1`; in Docker è raggiungibile dalla rete). Se lo imposti, ogni `/api/*` (tranne
+  `/api/health`) richiede `Authorization: Bearer <token>` oppure `X-API-Key: <token>`; l'interfaccia lo chiede
+  una volta e lo ricorda.
 
 ## Coda
 | Metodo | Percorso | Cosa fa |
@@ -45,7 +46,9 @@ Risposta di `POST /api/queue` (`201` se almeno un link è stato aggiunto, altrim
 | `GET` | `/api/history` | Esito per traccia. Filtro `?status=downloaded,needs-manual,no-download,error,stopped`. |
 | `GET` | `/api/log` | Ultime righe di log (`?lines=100`, max 500). |
 | `GET` | `/api/accounts` | Account collegati (SoundCloud/Spotify/Instagram) ed email impostata. |
-| `POST` | `/api/accounts/check` | Riverifica i collegamenti (non mentre la coda gira). |
+| `POST` | `/api/accounts/check` | Riverifica i collegamenti, in modo reale (non mentre la coda gira). |
+| `POST` | `/api/accounts/:site/login` | Apre il login (`soundcloud`, `spotify`, `instagram`). Se è già aperto lo **riapre**. In Docker risponde con `remote.path`: l'indirizzo dello schermo remoto, sulla stessa porta dell'app. |
+| `POST` | `/api/login/close` | Chiude il login (anche se la finestra è «rimasta aperta») e riverifica gli account. |
 
 ## Impostazioni e file
 | Metodo | Percorso | Cosa fa |

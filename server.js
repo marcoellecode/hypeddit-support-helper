@@ -4,6 +4,8 @@
 import path from "path"
 import fs from "fs"
 import crypto from "crypto"
+import http from "http"
+import net from "net"
 import { spawn } from "child_process"
 import express from "express"
 import { fileURLToPath } from "url"
@@ -14,6 +16,10 @@ import {
   pauseBetweenTracks,
   closeBrowser,
   openLoginWindow,
+  closeLoginWindow,
+  loginSiteOpen,
+  remoteLoginActive,
+  novncPort,
   checkAccounts,
   verifyAccount,
   loginWindowOpen,
@@ -33,22 +39,19 @@ const stateFile = path.join(dataDir, "state.json")
 const logFile = path.join(dataDir, "log.txt")
 loadSettings(dataDir)
 
-// Rete: di default solo localhost. In Docker: HSH_HOST=0.0.0.0 (la porta poi si pubblica
-// solo sull'IP della LAN/Tailscale dal compose) e HSH_ALLOWED_HOSTS con i nomi/IP da cui
-// raggiungi l'app (es. "server.local,192.168.1.50,mioserver.tail1234.ts.net").
+// Rete: di default solo localhost. In Docker: HSH_HOST=0.0.0.0 (gia' impostato nell'immagine).
+// Il token API e' FACOLTATIVO (HSH_API_TOKEN): senza, chiunque sulla tua rete puo' usare l'app.
 const PORT = Number(process.env.HSH_PORT) || 5178
 const HOST = process.env.HSH_HOST || "127.0.0.1"
 const URL_HOME = `http://localhost:${PORT}`
 const LOCAL_ONLY = ["127.0.0.1", "localhost", "::1"].includes(HOST)
-const allowedNames = new Set(
-  ["localhost", "127.0.0.1", ...(process.env.HSH_ALLOWED_HOSTS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)]
-)
-if (!LOCAL_ONLY && !process.env.HSH_API_TOKEN && !process.env.HSH_ALLOW_NO_TOKEN) {
-  console.error(
-    "\n  RIFIUTO DI PARTIRE: l'app e' raggiungibile dalla rete (HSH_HOST=" + HOST + ") ma manca HSH_API_TOKEN.\n" +
-      "  Pilota i tuoi account social: imposta un token (HSH_API_TOKEN) oppure, a tuo rischio, HSH_ALLOW_NO_TOKEN=1.\n"
+const API_TOKEN = process.env.HSH_API_TOKEN || ""
+const extraHosts = new Set((process.env.HSH_ALLOWED_HOSTS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean))
+if (!LOCAL_ONLY && !API_TOKEN) {
+  console.log(
+    "\n  NOTA: nessun token API impostato: chiunque sulla tua rete puo' usare l'app e i tuoi account.\n" +
+      "  Va bene su una rete di casa fidata; per proteggerla imposta HSH_API_TOKEN (facoltativo).\n"
   )
-  process.exit(1)
 }
 
 // url -> { status, file, at }  (persistito su disco)
@@ -94,13 +97,18 @@ async function refreshAccounts() {
 
 const app = express()
 
-// Difesa: il cruscotto pilota i tuoi account, accetta solo richieste dalla tua macchina
-// (blocca DNS-rebinding e pagine web di terzi che provano a chiamarlo).
-// L'header Host (e Origin, se presente) deve essere uno dei nomi ammessi, con o senza porta
-// (con Tailscale serve / reverse proxy la porta puo' mancare).
-const hostOk = (h) => {
-  const m = /^(\[[^\]]+\]|[^:]+)(?::(\d+))?$/.exec(String(h || "").toLowerCase())
-  return !!m && allowedNames.has(m[1]) && (!m[2] || Number(m[2]) === PORT || !!process.env.HSH_BEHIND_PROXY)
+// Difesa dal DNS-rebinding (una pagina web esterna che prova a raggiungere l'app): l'header Host
+// (e Origin, se presente) deve essere "locale". In rete NON serve configurare nulla: sono
+// accettati gli indirizzi IP, i nomi senza punti e i suffissi di rete locale / Tailscale, cioe'
+// quello che un sito esterno non puo' usare. La porta non conta (puo' essere rimappata dall'host).
+const isIp = (h) => /^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(":")
+const hostOk = (hostHeader) => {
+  const m = /^(\[[^\]]+\]|[^:]+)(?::\d+)?$/.exec(String(hostHeader || "").toLowerCase())
+  if (!m) return false
+  const name = m[1].replace(/^\[|\]$/g, "")
+  if (name === "localhost" || name === "127.0.0.1" || name === "::1" || extraHosts.has(name)) return true
+  if (LOCAL_ONLY) return false
+  return isIp(name) || !name.includes(".") || /\.(local|lan|home\.arpa|internal|ts\.net)$/.test(name)
 }
 app.use((req, res, next) => {
   if (!hostOk(req.headers.host)) return res.status(403).end("host non consentito")
@@ -112,9 +120,9 @@ app.use((req, res, next) => {
   }
   next()
 })
+
 // Token opzionale per l'API: se HSH_API_TOKEN e' impostato, ogni /api/* (tranne /api/health)
 // richiede "Authorization: Bearer <token>" oppure l'header "X-API-Key".
-const API_TOKEN = process.env.HSH_API_TOKEN || ""
 const sha = (s) => crypto.createHash("sha256").update(String(s)).digest()
 app.use("/api", (req, res, next) => {
   if (!API_TOKEN || req.path === "/health") return next()
@@ -169,6 +177,10 @@ app.get("/api/status", (_req, res) =>
     accounts,
     checkedAt,
     loginWindowOpen: loginWindowOpen(),
+    loginSite: loginSiteOpen(),
+    remoteLogin: remoteLoginActive(),
+    protected: !!API_TOKEN, // true = serve il token API
+    networkOpen: !LOCAL_ONLY, // true = raggiungibile dalla rete (non solo da questo PC)
     browserOpen: browserOpen(),
     browserUsed: CHANNEL_LABEL[resolveChannel()],
     history,
@@ -207,11 +219,19 @@ app.post("/api/accounts/:site/login", async (req, res) => {
   if (!LOGIN_URLS[site]) return res.status(404).json({ error: "Account sconosciuto" })
   if (state.running) return res.status(409).json({ error: "Coda in esecuzione: fermala per accedere a un account" })
   try {
+    // se la finestra e' gia' aperta la RIAPRE (non e' mai un errore)
     const info = await openLoginWindow(site, log, () => refreshAccounts().catch(() => {}))
     res.json({ ok: true, ...info })
   } catch (e) {
-    res.status(/gia' aperta/.test(e.message) ? 409 : 500).json({ error: e.message })
+    res.status(/si sta aprendo/.test(e.message) ? 409 : 500).json({ error: e.message })
   }
+})
+
+// Chiude il login anche se la finestra e' "rimasta aperta" (es. hai chiuso solo la scheda dello
+// schermo remoto): termina il browser e lo schermo remoto e riverifica gli account.
+app.post("/api/login/close", (_req, res) => {
+  const closed = closeLoginWindow(log)
+  res.json({ ok: true, closed })
 })
 
 app.post("/api/accounts/check", async (_req, res) => {
@@ -516,10 +536,29 @@ app.get("/api/downloads/:name", (req, res) => {
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, running: state.running, pending: queue.length }))
 
+// ---------- Schermo remoto (login in Docker) ----------
+// websockify/noVNC ascolta solo su 127.0.0.1 dentro il container; qui lo ripropongo sotto
+// /novnc sulla STESSA porta dell'app: nessuna seconda porta da pubblicare o rimappare.
+const upstreamHeaders = (headers) => ({ ...headers, host: `127.0.0.1:${novncPort()}` })
+app.use("/novnc", (req, res) => {
+  if (!remoteLoginActive()) {
+    return res.status(503).type("text/plain").end("Schermo remoto non attivo: premi Accedi su un account nelle Impostazioni.")
+  }
+  const up = http.request(
+    { host: "127.0.0.1", port: novncPort(), path: req.url, method: req.method, headers: upstreamHeaders(req.headers) },
+    (pr) => {
+      res.writeHead(pr.statusCode || 502, pr.headers)
+      pr.pipe(res)
+    }
+  )
+  up.on("error", () => { if (!res.headersSent) res.status(502).type("text/plain").end("Schermo remoto non ancora pronto: riprova tra un attimo.") })
+  req.pipe(up)
+})
+
 // Indice dell'API (autodescrittivo)
 app.get("/api", (_req, res) =>
   res.json({
-    auth: API_TOKEN ? "Authorization: Bearer <HSH_API_TOKEN> oppure X-API-Key" : "nessuna (solo localhost)",
+    auth: API_TOKEN ? "Authorization: Bearer <HSH_API_TOKEN> oppure X-API-Key" : "nessuna (token facoltativo: HSH_API_TOKEN)",
     endpoints: [
       "GET    /api/health",
       "GET    /api/status",
@@ -533,6 +572,8 @@ app.get("/api", (_req, res) =>
       "GET    /api/log[?lines=100]",
       "GET    /api/accounts",
       "POST   /api/accounts/check",
+      "POST   /api/accounts/:site/login   (riapre il login se gia' aperto)",
+      "POST   /api/login/close",
       "GET    /api/settings",
       "POST   /api/settings",
       "GET    /api/downloads",
@@ -563,6 +604,26 @@ const server = app.listen(PORT, HOST, () => {
     if (CONFIG.autoStart) startWorker()
   }
 })
+// WebSocket di noVNC (/novnc/websockify): inoltro "grezzo" verso websockify locale
+server.on("upgrade", (req, socket, head) => {
+  if (!req.url.startsWith("/novnc/") || !hostOk(req.headers.host) || !remoteLoginActive()) return socket.destroy()
+  const up = net.connect(novncPort(), "127.0.0.1", () => {
+    const CRLF = "\r\n"
+    let raw = `${req.method} ${req.url.slice("/novnc".length)} HTTP/1.1${CRLF}`
+    for (let i = 0; i < req.rawHeaders.length; i += 2) {
+      const name = req.rawHeaders[i]
+      const value = name.toLowerCase() === "host" ? `127.0.0.1:${novncPort()}` : req.rawHeaders[i + 1]
+      raw += `${name}: ${value}${CRLF}`
+    }
+    up.write(raw + CRLF)
+    if (head && head.length) up.write(head)
+    socket.pipe(up)
+    up.pipe(socket)
+  })
+  up.on("error", () => socket.destroy())
+  socket.on("error", () => up.destroy())
+})
+
 server.on("error", (e) => {
   if (e.code === "EADDRINUSE") {
     console.log(`\n  Il cruscotto e' gia' aperto su ${URL_HOME}: lo riapro nel browser.\n`)

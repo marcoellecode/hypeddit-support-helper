@@ -119,23 +119,25 @@ cd hypeddit-support-helper
 **Aggiornare:** scarica la nuova versione e sostituisci i file **tenendo le cartelle `data/`,
 `user-profile/` e `downloads/`**: contengono impostazioni, login e file scaricati.
 
-### Opzione B — su un server con Docker (x86-64)
+### Opzione B — su un server con Docker (x86-64, anche ZimaOS/CasaOS)
 
 L'immagine è costruita automaticamente da GitHub Actions e pubblicata su GitHub Container
-Registry. **Solo x86-64**: Google Chrome per Linux non esiste per ARM.
+Registry. **Solo x86-64**: Google Chrome per Linux non esiste per ARM. **Non serve configurare nulla.**
 
 ```bash
-# scarica compose ed esempio di configurazione
+mkdir hypeddit-support-helper && cd hypeddit-support-helper
 curl -LO https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.yml
-curl -L  https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/.env.example -o .env
-nano .env                      # token, password dello schermo remoto, IP, host ammessi
-docker compose pull && docker compose up -d
+mkdir -p downloads && sudo chown 1000:1000 downloads
+docker compose up -d
 ```
+Poi apri `http://<IP-del-server>:5178`.
 
-- **ZimaOS / CasaOS:** c'è un compose pronto, [`docker-compose.zimaos.yml`](docker-compose.zimaos.yml),
-  da importare in *Installazione personalizzata*.
-- Tutti i dettagli (rete LAN/Tailscale, primo accesso agli account, aggiornamenti, risoluzione
-  dei problemi): **[DOCKER.md](DOCKER.md)**.
+- **ZimaOS / CasaOS:** c'è un pacchetto pronto, con icona e descrizione, in
+  [`Apps/HypedditSupportHelper`](Apps/HypedditSupportHelper/docker-compose.yml): importalo in
+  *Installazione personalizzata* oppure aggiungi il repository come App Store di terze parti.
+- Il login degli account avviene da uno **schermo remoto aperto nel browser**, sulla stessa porta dell'app.
+- Tutti i dettagli (porta diversa, primo accesso agli account, sicurezza, aggiornamenti, problemi):
+  **[DOCKER.md](DOCKER.md)**.
 
 ---
 
@@ -158,14 +160,14 @@ Tutto si imposta dall'interfaccia (scheda *Impostazioni*) e viene salvato in `da
 pause tra le tracce, tetto di tracce, browser da usare, cartella download, commento, avvio
 automatico quando arrivano link via API, selettori del gate (se Hypeddit cambia la pagina).
 
-Variabili d'ambiente (utili soprattutto con Docker):
+Variabili d'ambiente (**tutte facoltative**):
 
 | Variabile | A cosa serve |
 |---|---|
-| `HSH_API_TOKEN` | Token per cruscotto e API. **Obbligatorio** se l'app è raggiungibile dalla rete. |
-| `HSH_HOST`, `HSH_PORT` | Dove ascolta (default `127.0.0.1:5178`). |
-| `HSH_ALLOWED_HOSTS` | Nomi/IP con cui raggiungi il server (altrimenti 403). |
-| `HSH_VNC_PASSWORD` | Password dello schermo remoto per il login (Docker). |
+| `HSH_API_TOKEN` | Token per cruscotto e API. Facoltativo: se vuoto l'app si apre senza chiedere nulla (va bene su una rete di casa fidata). |
+| `HSH_HOST`, `HSH_PORT` | Dove ascolta (default `127.0.0.1:5178`; nell'immagine Docker `0.0.0.0`). |
+| `HSH_ALLOWED_HOSTS` | Solo per un dominio tuo (es. dietro un reverse proxy): l'host di rete locale/Tailscale è già accettato in automatico. |
+| `HSH_VNC_PASSWORD` | Password fissa per lo schermo remoto (default: casuale a ogni login, passata nell'indirizzo). |
 | `HSH_WEBHOOK_URL` | Riceve un POST JSON per `account-expired` e `queue-finished`. |
 | `HSH_DATA_DIR`, `HSH_DOWNLOAD_DIR`, `HSH_PROFILE_DIR` | Cartelle di dati, download e profilo del browser. |
 | `HSH_LOCALE` | Lingua del browser (default `it-IT`: gli step sono collaudati in italiano). |
@@ -186,14 +188,19 @@ scheda **API** dell'interfaccia; il riferimento testuale è in **[API.md](API.md
 
 ## Sicurezza
 
-- Di default l'app ascolta **solo su `127.0.0.1`** e rifiuta host e origini non ammessi.
-- Fuori da localhost **non parte senza `HSH_API_TOKEN`**.
-- Il profilo del browser contiene i tuoi login: trattalo come una password. È escluso dal
-  repository (`.gitignore`) e dall'immagine Docker.
-- Su Docker pubblica le porte **solo sull'IP della LAN o di Tailscale**, mai sul router. Lo
-  schermo remoto (VNC) non è cifrato: tienilo su rete fidata.
-- Nessun dato viene inviato a terzi: l'app parla solo con Hypeddit e con i siti che pilota
-  (più l'eventuale webhook che configuri tu).
+- Di default l'app ascolta **solo su `127.0.0.1`** (sul PC). In Docker è raggiungibile dalla rete:
+  senza `HSH_API_TOKEN` **chiunque sulla tua rete può usarla** (e quindi usare i tuoi account), perciò va
+  bene solo su una rete di casa fidata. Per proteggerla imposta il token (facoltativo). L'app lo segnala
+  con un avviso in alto nell'interfaccia.
+- Difesa automatica dal DNS-rebinding: accetta solo richieste con host locale (IP, nomi senza punti,
+  `.local`, Tailscale…), senza nulla da configurare.
+- **Non esporre la porta su internet**; da fuori casa usa una VPN (es. Tailscale).
+- Il profilo del browser contiene i tuoi login: trattalo come una password. È escluso dal repository
+  (`.gitignore`) e dall'immagine Docker.
+- Lo schermo remoto per il login è protetto da una password casuale per sessione ed esiste solo mentre
+  il login è aperto; non è cifrato: tienilo su rete fidata.
+- Nessun dato viene inviato a terzi: l'app parla solo con Hypeddit e con i siti che pilota (più
+  l'eventuale webhook che configuri tu).
 
 ## Limiti e onestà
 
@@ -220,7 +227,8 @@ scheda **API** dell'interfaccia; il riferimento testuale è in **[API.md](API.md
 | `automate.js` | Logica Playwright: gate, azioni social, verifica degli account, login remoto |
 | `settings.js`, `config.js` | Impostazioni, validazione e valori predefiniti |
 | `public/index.html` | Interfaccia (Coda, Impostazioni, API) |
-| `Dockerfile`, `docker-compose*.yml` | Immagine e compose (generico e ZimaOS) |
+| `Dockerfile`, `docker-compose.yml` | Immagine e compose |
+| `Apps/HypedditSupportHelper/` | Pacchetto per ZimaOS / CasaOS (compose con metadati e icona) |
 | `.github/workflows/docker.yml` | Controlli e pubblicazione dell'immagine su ghcr.io |
 | `avvia.cmd` | Avvio con un doppio clic su Windows |
 | `API.md`, `DOCKER.md` | Riferimento API e guida Docker |

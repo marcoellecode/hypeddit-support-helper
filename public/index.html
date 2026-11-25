@@ -104,6 +104,10 @@
 <div class="wrap">
   <h1>Hypeddit Support Helper</h1>
   <p class="sub">Supporta gli artisti in sequenza coi tuoi account reali. Le azioni social restano autentiche.</p>
+  <div class="banner" id="openWarn" hidden>
+    <span>⚠ Nessun token impostato: chiunque sulla tua rete può usare questa app (e i tuoi account). Va bene su una rete di casa fidata;
+      per proteggerla imposta la variabile <code>HSH_API_TOKEN</code> (facoltativa).</span>
+  </div>
 
   <div class="tabs">
     <button class="tab active" data-tab="queue">Coda</button>
@@ -182,6 +186,13 @@
           </div>
           <div class="hint extra" style="margin:0">Usati nello step "email" del gate. Se vuoti, quello step lo compili tu a mano.</div>
         </div>
+      </div>
+      <div class="banner" id="loginBar" hidden>
+        <span id="loginBarTxt"></span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn sec" id="loginReopen" type="button">↗ Riapri finestra</button>
+          <button class="btn danger" id="loginClose" type="button">Chiudi login e verifica</button>
+        </span>
       </div>
       <div class="row"><button class="btn sec" id="checkAcc">↻ Verifica collegamenti</button>
         <span class="stat" id="checkNote"></span></div>
@@ -368,20 +379,28 @@ $("saveBtn").onclick = async () => {
 $("resetSel").onclick = async () => {
   try { const r = await api("/api/settings/reset-selectors", {}); fillForm(r.settings); toast("Selettori ripristinati"); } catch (e) { toast(e.message, true); }
 };
-document.querySelectorAll("[data-login]").forEach((b) => (b.onclick = async () => {
-  b.disabled = true;
+// Apre (o RIAPRE, se e' gia' aperta) la finestra di login. Su un server senza schermo (Docker)
+// apre lo schermo remoto sulla STESSA porta di questa pagina: nessuna porta da configurare, e la
+// password viene passata nell'indirizzo.
+async function openLogin(site) {
   try {
-    const r = await api("/api/accounts/" + b.dataset.login + "/login", {});
+    const r = await api("/api/accounts/" + site + "/login", {});
     if (r.remote) {
-      // server senza schermo (Docker): apro lo schermo remoto del server; password = HSH_VNC_PASSWORD
-      const u = location.protocol + "//" + location.hostname + ":" + r.remote.port + r.remote.path;
-      window.open(u, "_blank") || prompt("Apri questo indirizzo per accedere (password: HSH_VNC_PASSWORD):", u);
-      toast("Schermo remoto aperto: accedi, poi chiudi Chrome (la X della finestra)");
-    } else toast("Browser aperto: accedi e poi chiudi la finestra");
-  }
-  catch (e) { toast(e.message, true); }
-  b.disabled = false; poll();
+      const u = location.origin + r.remote.path;
+      window.open(u, "_blank") || prompt("Apri questo indirizzo per accedere:", u);
+      toast(r.reopened ? "Schermo remoto riaperto" : "Schermo remoto aperto: accedi, poi chiudi Chrome o premi «Chiudi login»");
+    } else toast(r.reopened ? "Finestra di login riaperta" : "Browser aperto: accedi e poi chiudi la finestra");
+  } catch (e) { toast(e.message, true); }
+  poll();
+}
+document.querySelectorAll("[data-login]").forEach((b) => (b.onclick = async () => {
+  b.disabled = true; await openLogin(b.dataset.login); b.disabled = false;
 }));
+$("loginReopen").onclick = () => openLogin((status && status.loginSite) || "soundcloud");
+$("loginClose").onclick = async () => {
+  try { await api("/api/login/close", {}); toast("Login chiuso: verifico i collegamenti…"); } catch (e) { toast(e.message, true); }
+  poll();
+};
 $("checkAcc").onclick = async () => {
   $("checkNote").textContent = "Controllo in corso…";
   try { await api("/api/accounts/check", {}); $("checkNote").textContent = ""; toast("Collegamenti aggiornati"); }
@@ -473,11 +492,17 @@ async function poll() {
       $("pill_" + k).className = "pill " + cls; $("pill_" + k).textContent = txt;
     }
     $("pill_email").className = "pill " + (s.emailSet ? "ok" : "no"); $("pill_email").textContent = s.emailSet ? "Impostata" : "Non impostata";
+    const SITE = { soundcloud: "SoundCloud", spotify: "Spotify", instagram: "Instagram" };
     document.querySelectorAll("[data-login]").forEach((b) => {
-      const open = s.loginWindowOpen;
-      b.disabled = open || s.running; b.textContent = open ? "Finestra aperta…" : (s.accounts[b.dataset.login] ? "Cambia account" : "Accedi");
+      const k = b.dataset.login, open = s.loginWindowOpen;
+      // con la finestra aperta il tasto non si blocca mai: la RIAPRE (su questo sito)
+      b.disabled = s.running;
+      b.textContent = open ? (s.loginSite === k ? "Riapri finestra" : "Apri qui") : (s.accounts[k] ? "Cambia account" : "Accedi");
     });
+    $("loginBar").hidden = !s.loginWindowOpen;
+    if (s.loginWindowOpen) $("loginBarTxt").textContent = "Finestra di login aperta" + (s.loginSite ? " (" + SITE[s.loginSite] + ")" : "") + ". Se l'hai chiusa per sbaglio riaprila, oppure chiudi il login per continuare.";
     $("checkAcc").disabled = s.loginWindowOpen || s.running;
+    $("openWarn").hidden = !(s.networkOpen && !s.protected);
     $("browserUsed").textContent = "· browser: " + s.browserUsed;
     renderHistory(s.history);
   } catch {}
@@ -550,9 +575,12 @@ const API_GROUPS = [
       res: '{ "ok": true, "accounts": { "soundcloud": true, "spotify": true, "instagram": true } }',
       codes: "409 se la coda sta lavorando", danger: () => "Apre i siti con il profilo dell'app per verificare l'accesso (circa 20 secondi)." },
     { m: "POST", p: "/api/accounts/soundcloud/login", t: "Apri il login di un account",
-      d: "Sostituisci soundcloud con spotify o instagram. Apre un browser normale per accedere. In Docker risponde con { \"remote\": { \"port\": 6080, \"path\": \"/vnc.html?…\" } }: apri quella porta del server (password = HSH_VNC_PASSWORD).",
-      res: '{ "ok": true }', codes: "409 se la coda lavora o una finestra di login è già aperta",
+      d: "Sostituisci soundcloud con spotify o instagram. Apre un browser normale per accedere. Se la finestra è già aperta la RIAPRE (con \"reopened\": true) invece di dare errore. In Docker risponde con { \"remote\": { \"path\": \"/novnc/vnc.html?…\" } }: apri quell'indirizzo sulla stessa porta dell'app (la password è già nell'indirizzo).",
+      res: '{ "ok": true }', codes: "409 se la coda lavora",
       danger: () => "Apre una finestra di login sul computer o sul server dove gira l'app." },
+    { m: "POST", p: "/api/login/close", t: "Chiudi il login",
+      d: "Chiude il browser di login e lo schermo remoto (anche se la finestra è «rimasta aperta») e riverifica gli account.",
+      res: '{ "ok": true, "closed": true }', danger: () => "Chiude la finestra di login aperta." },
   ] },
   { title: "Impostazioni e file", items: [
     { m: "GET", p: "/api/settings", t: "Leggi le impostazioni",

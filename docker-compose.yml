@@ -1,27 +1,27 @@
-# Uso: copia .env.example in .env, compilalo, poi `docker compose pull && docker compose up -d`
-# (oppure `docker compose up -d --build` per costruire l'immagine sul posto).
-# Dettagli (primo accesso agli account, Tailscale, aggiornamenti): DOCKER.md
+# Uso: `docker compose up -d` (scarica l'immagine pubblicata da GitHub) oppure
+# `docker compose up -d --build` per costruirla qui. Non serve configurare nulla.
+# Per ZimaOS / CasaOS usa invece Apps/HypedditSupportHelper/docker-compose.yml.
+# Dettagli (primo accesso agli account, aggiornamenti, problemi): DOCKER.md
+name: hypeddit-support-helper
+
 services:
-  hypeddit:
+  hypeddit-support-helper:
     build: .
     # immagine pubblicata da GitHub Actions; `build: .` serve solo se vuoi costruirla qui
     image: ghcr.io/marcoellecode/hypeddit-support-helper:latest
-    container_name: hypeddit
-    hostname: hypeddit        # fisso: dopo un ricreo Chrome non vede il profilo come "di un altro PC"
+    container_name: hypeddit-support-helper
+    hostname: hypeddit-support-helper   # fisso: dopo un ricreo Chrome non vede il profilo come "di un altro PC"
     restart: unless-stopped
-    shm_size: "1gb"           # Chrome in container crasha con la /dev/shm di default (64 MB)
-    env_file: .env
+    shm_size: "1gb"                     # Chrome in container crasha con la /dev/shm di default (64 MB)
     environment:
-      HSH_API_TOKEN: ${HSH_API_TOKEN:?imposta HSH_API_TOKEN nel file .env}
-      HSH_VNC_PASSWORD: ${HSH_VNC_PASSWORD:?imposta HSH_VNC_PASSWORD (almeno 8 caratteri) nel file .env}
-      HSH_ALLOWED_HOSTS: ${HSH_ALLOWED_HOSTS:-}
-      HSH_WEBHOOK_URL: ${HSH_WEBHOOK_URL:-}
       TZ: ${TZ:-Europe/Rome}
+      # FACOLTATIVI (lascia vuoti se non servono):
+      HSH_API_TOKEN: ${HSH_API_TOKEN:-}       # protegge cruscotto e API da altri dispositivi della rete
+      HSH_WEBHOOK_URL: ${HSH_WEBHOOK_URL:-}   # riceve un POST per "account scaduto" e "coda finita"
     ports:
-      # Pubblica SOLO sull'IP indicato (LAN o Tailscale), mai 0.0.0.0 e mai dal router.
-      # 5178 = cruscotto + API; 6080 = schermo remoto per il login (attivo solo durante il login)
-      - "${HSH_BIND_IP:-127.0.0.1}:5178:5178"
-      - "${HSH_BIND_IP:-127.0.0.1}:6080:6080"
+      # Cambia SOLO il numero a sinistra se la 5178 e' occupata sul server: tutto (anche lo schermo
+      # remoto del login) passa da questa unica porta.
+      - "${HSH_HOST_PORT:-5178}:5178"
     volumes:
       - hsh-data:/data                                # profilo browser (login), coda, cronologia, impostazioni
       - ${HSH_DOWNLOADS_DIR:-./downloads}:/downloads  # i file scaricati (la cartella deve essere scrivibile da uid 1000)

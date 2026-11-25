@@ -1,112 +1,118 @@
-# Docker (server Linux x86-64 a casa)
+# Docker (server Linux x86-64: NAS, mini-PC, ZimaOS…)
 
-> **Stato:** l'immagine viene costruita e pubblicata da GitHub Actions su
-> `ghcr.io/marcoellecode/hypeddit-support-helper` (solo `linux/amd64`). Codice, rete, token,
-> verifica degli account e API sono collaudati su Windows; **il login remoto (Xvfb/noVNC) e Chrome
-> nel container sono la parte più nuova**: vedi "Primo avvio: controlli".
+L'immagine viene costruita e pubblicata da GitHub Actions su
+`ghcr.io/marcoellecode/hypeddit-support-helper` (solo `linux/amd64`: Google Chrome per Linux non
+esiste per ARM). **Non serve configurare nulla**: si installa, si apre l'app e si collegano gli account.
 
 ## Cosa c'è
-Un solo servizio, `hypeddit`:
-- cruscotto + API su `:5178` (stessa app di Windows, in headless con Google Chrome);
-- **schermo remoto per il login** su `:6080` (Xvfb + x11vnc + noVNC): si accende **solo** quando
-  premi "Accedi" su un account e si spegne quando chiudi Chrome;
-- volume `hsh-data` (profilo del browser con i login, coda, cronologia, impostazioni) e cartella
-  `downloads` sul server.
+Un solo contenitore, `hypeddit-support-helper`:
+- cruscotto + API su una **sola porta** (`5178` nel container, mappabile come vuoi sull'host);
+- browser Google Chrome headless per la coda;
+- **schermo remoto per il login** (Xvfb + x11vnc + noVNC), che si accende solo quando premi
+  «Accedi» e passa **dalla stessa porta dell'app**: se cambi la porta sull'host funziona uguale;
+- un volume per i dati (profilo del browser con i login, coda, cronologia, impostazioni) e una
+  cartella per i download.
 
-## Requisiti
-- Server **x86-64** con Docker e Docker Compose v2. (Su ARM l'immagine non si costruisce:
-  Google Chrome per Linux esiste solo per x86-64.)
-- La cartella dei download deve essere scrivibile dall'utente `uid 1000` del container:
-  `mkdir -p downloads && sudo chown 1000:1000 downloads`.
-
-## Installazione (immagine da GitHub, consigliata)
+## Installazione con Docker Compose
 ```bash
-mkdir hypeddit && cd hypeddit
+mkdir hypeddit-support-helper && cd hypeddit-support-helper
 curl -LO https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.yml
-curl -L  https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/.env.example -o .env
 mkdir -p downloads && sudo chown 1000:1000 downloads
-nano .env      # HSH_API_TOKEN, HSH_VNC_PASSWORD, HSH_BIND_IP, HSH_ALLOWED_HOSTS
-docker compose pull && docker compose up -d
-docker compose logs -f
+docker compose up -d
 ```
-Se l'immagine risulta privata (`pull access denied`): su GitHub vai in *Packages →
-hypeddit-support-helper → Package settings → Change visibility → Public*.
+Poi apri `http://<IP-del-server>:5178`.
 
-Per costruirla sul posto invece di scaricarla: clona il repository e usa `docker compose up -d --build`.
+- Porta occupata? Cambia il numero **a sinistra** in `ports:` (es. `"8178:5178"`) oppure metti
+  `HSH_HOST_PORT=8178` in un file `.env`.
+- Altre opzioni (tutte facoltative) sono in [`.env.example`](.env.example).
+- Se l'immagine risulta privata (`pull access denied`): su GitHub, *Packages → hypeddit-support-helper →
+  Package settings → Change visibility → Public*.
+- Per costruirla sul posto invece di scaricarla: clona il repository e usa `docker compose up -d --build`.
 
-## ZimaOS
-1. App Store → **Installazione personalizzata** (Custom Install) → importa
-   [`docker-compose.zimaos.yml`](docker-compose.zimaos.yml) (puoi incollarne il contenuto).
-2. Prima di installare cambia i valori **CAMBIA**: `HSH_API_TOKEN`, `HSH_VNC_PASSWORD` e
-   `HSH_ALLOWED_HOSTS` (l'IP di ZimaOS e/o il nome con cui lo raggiungi).
-3. Installa. I dati stanno in `/DATA/AppData/hypeddit/data` e i download in
-   `/DATA/Downloads/hypeddit` (li vedi dall'app *File*).
-4. Apri `http://<IP-ZimaOS>:5178` e prosegui con "Primo accesso agli account".
+## ZimaOS / CasaOS
+C'è un pacchetto pronto, con nome, icona e descrizione, in
+[`Apps/HypedditSupportHelper`](Apps/HypedditSupportHelper/docker-compose.yml).
 
-Il container gira come root (`user: "0:0"`) perché le cartelle `/DATA` di ZimaOS sono di root.
+**Metodo 1 — installazione personalizzata (il più semplice)**
+1. *App Store → Installazione personalizzata (Custom Install)*.
+2. Importa il file [`docker-compose.yml`](Apps/HypedditSupportHelper/docker-compose.yml) (o incolla il contenuto).
+3. Installa. Non c'è niente da cambiare: porta `5178`, dati in `/DATA/AppData/hypeddit-support-helper/data`
+   e download in `/DATA/Downloads/Hypeddit` (li vedi dall'app *File*).
 
-### Rete (LAN / Tailscale)
-- `HSH_BIND_IP`: l'IP del server su cui pubblicare le porte. Con Tailscale usa quello `100.x.y.z`
-  (`tailscale ip -4`); per la LAN quello di casa. **Non** usare `0.0.0.0` e **non** aprire porte
-  sul router.
-- `HSH_ALLOWED_HOSTS`: tutti i modi con cui raggiungi il server, separati da virgole, per esempio
-  `192.168.1.50,mioserver,mioserver.tailXXXX.ts.net,100.101.102.103`. Con un nome o un IP non
-  elencato l'app risponde 403.
-- Se metti davanti un reverse proxy (o `tailscale serve`) che cambia la porta, aggiungi
-  `HSH_BEHIND_PROXY=1` al `.env`.
-- L'app **non parte** senza `HSH_API_TOKEN` quando è raggiungibile dalla rete: pilota i tuoi
-  account.
+**Metodo 2 — come App Store di terze parti**
+*App Store → ⚙ → aggiungi sorgente* e inserisci
+`https://github.com/marcoellecode/hypeddit-support-helper/archive/refs/heads/main.zip`.
+L'app compare nell'elenco con la sua icona.
+
+Se la porta 5178 è occupata, cambia **solo il numero `published`** nelle impostazioni dell'app: tutto
+continua a funzionare (anche lo schermo remoto), perché passa da quella unica porta.
+Il container gira come root perché le cartelle `/DATA` di ZimaOS sono di root.
 
 ## Primo accesso agli account (una volta sola)
-1. Apri `http://<server>:5178` e inserisci il token quando richiesto.
-2. **Impostazioni → Account → Accedi** (SoundCloud, Spotify, Instagram, uno alla volta).
-3. Si apre una scheda con lo schermo del server (noVNC). Password: `HSH_VNC_PASSWORD`.
-4. Accedi come faresti sul PC, **anche con Google** (è Chrome vero, non pilotato). Poi chiudi
-   Chrome con la X della finestra: lo schermo si spegne e il collegamento viene verificato.
-5. Alla fine **Verifica collegamenti** deve mostrare "Collegato" per tutti.
+1. Apri l'app → **Impostazioni → Account → Accedi** (SoundCloud, Spotify, Instagram, uno alla volta).
+2. Si apre una scheda con lo **schermo del server**. La password è già inserita nell'indirizzo
+   (generata a caso a ogni login): non devi impostare niente.
+3. Accedi come sul PC, **anche con Google** (è Chrome vero, non pilotato). Poi **chiudi Chrome** con la X
+   della finestra **oppure** premi **«Chiudi login e verifica»** nella pagina dell'app.
+4. Alla fine **Verifica collegamenti** deve mostrare «Collegato».
 
-Il login resta nel volume `hsh-data`: sopravvive a riavvii e aggiornamenti.
-Le sessioni sono quelle del server (IP di casa), indipendenti da quelle del tuo PC.
+> **Hai chiuso per sbaglio la scheda dello schermo remoto?** Nessun problema: nelle Impostazioni
+> compare «Finestra di login aperta» con i tasti **Riapri finestra** e **Chiudi login e verifica**; anche i
+> tasti dei singoli account diventano «Riapri finestra». Non resti mai bloccato.
+
+Il login resta nel volume dei dati: sopravvive a riavvii e aggiornamenti. Le sessioni sono quelle del
+server (IP di casa), indipendenti da quelle del tuo PC.
+
+## Sicurezza (token facoltativo)
+Di default l'app si apre **senza token**: va bene su una rete di casa fidata. Chiunque raggiunga la porta
+può però usare l'app (e quindi i tuoi account). Se vuoi proteggerla imposta `HSH_API_TOKEN`: cruscotto e
+API chiederanno il token (l'interfaccia lo chiede una volta e lo ricorda).
+
+- **Non esporre la porta su internet** e non aprire porte sul router. Per accedere da fuori casa usa una
+  VPN (es. Tailscale).
+- Il controllo dell'host è **automatico**: l'app accetta richieste con indirizzo IP, nome senza punti
+  (`zimaos`), `.local`, `.lan`, `.home.arpa` o `.ts.net` (Tailscale), e rifiuta i nomi pubblici (difesa dal
+  DNS-rebinding). Per un dominio tuo (es. dietro un reverse proxy) c'è la variabile facoltativa
+  `HSH_ALLOWED_HOSTS`.
+- Lo schermo remoto è protetto da una password casuale per sessione, ed esiste solo mentre il login è aperto.
+- Il volume dei dati contiene i tuoi login: trattalo come una password.
 
 ## Uso
-Dal cruscotto o dall'API (vedi `API.md`), per esempio:
+Dal cruscotto o dall'API (scheda **API** dell'interfaccia, oppure [`API.md`](API.md)):
 ```bash
-curl -X POST http://<server>:5178/api/queue -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" -d '{"url":"https://hypeddit.com/artista/traccia","start":true}'
+curl -X POST http://<IP-del-server>:5178/api/queue -H "Content-Type: application/json" \
+  -d '{"url":"https://hypeddit.com/artista/traccia","start":true}'
 ```
-Per far partire la coda da sola quando arrivano link: Impostazioni → "Avvia la coda da sola…".
+Per far partire la coda da sola quando arrivano link: Impostazioni → «Avvia la coda da sola…».
 
 ### Account scaduti
-Se durante la coda un'azione social fallisce, l'app **verifica davvero** l'accesso a quel sito.
-Se è scaduto, **ferma la coda**, rimette la traccia in testa, mostra l'avviso nel cruscotto
-e in `GET /api/status` (`alert`), e se hai impostato `HSH_WEBHOOK_URL` fa un `POST` JSON
-(`event: "account-expired"`, anche `queue-finished`). Rifai il login e riavvia la coda: nessun
-link va perso.
+Se durante la coda un'azione social fallisce, l'app **verifica davvero** l'accesso a quel sito. Se è
+scaduto **ferma la coda**, rimette la traccia in testa e mostra un avviso nel cruscotto e in
+`GET /api/status` (`alert`); con `HSH_WEBHOOK_URL` fa anche un `POST` JSON (`account-expired`,
+`queue-finished`). Rifai il login e riavvia: nessun link va perso.
 
 ## Comandi utili
 ```bash
-docker compose ps                 # stato (c'è anche l'healthcheck)
-docker compose logs -f            # log
-docker compose restart            # riavvio (la coda riprende dal disco)
-docker compose up -d --build      # aggiornamento dopo un cambio al codice
-docker compose down               # ferma (i dati restano nei volumi)
+docker compose ps                  # stato (c'è anche l'healthcheck)
+docker compose logs -f             # log
+docker compose restart             # riavvio (la coda riprende dal disco)
+docker compose pull && docker compose up -d   # aggiornamento all'ultima versione
+docker compose down                # ferma (i dati restano nel volume)
 ```
-Backup: il volume `hsh-data` contiene i login. Trattalo come una password.
 
-## Primo avvio: controlli (l'immagine non è stata provata)
+## Se qualcosa non va
 ```bash
-docker compose exec hypeddit sh -c 'ls -l /opt/google/chrome/chrome /usr/share/novnc/vnc.html; which Xvfb x11vnc websockify fluxbox'
-curl -s http://<server>:5178/api/health            # {"ok":true,...}
-curl -s -H "Authorization: Bearer $TOKEN" http://<server>:5178/api/accounts
+docker compose exec hypeddit-support-helper sh -c 'ls -l /opt/google/chrome/chrome /usr/share/novnc/vnc.html; which Xvfb x11vnc websockify fluxbox'
+curl -s http://<IP-del-server>:5178/api/health            # {"ok":true,...}
 ```
-Se qualcosa non va, cerca nei log le righe `Login remoto: ... non parte` e controlla che
-`docker compose exec hypeddit google-chrome-stable --version` (o `/opt/google/chrome/chrome --version`) risponda.
+Nei log cerca le righe `Login remoto: … non parte`. Per i problemi scrivi una *issue* su GitHub con
+l'output di `docker compose logs`.
 
 ## Limiti e rischi
-- **Automatizzare azioni sui tuoi account va contro i termini di Instagram, SoundCloud e
-  Spotify** e può far limitare l'account. L'app usa ritmi umani e un tetto di tracce.
+- **Automatizzare azioni sui tuoi account va contro i termini di Instagram, SoundCloud e Spotify** e può
+  far limitare l'account. L'app usa ritmi umani e un tetto di tracce.
 - Un browser headless è riconoscibile come tale; non ci sono trucchi per nasconderlo.
-- Instagram può chiedere una verifica di sicurezza: se succede l'app ferma la coda come per un
-  account scaduto; risolvila dallo schermo remoto (Accedi) e riavvia.
-- Il VNC ha una password a 8 caratteri e **non è cifrato**: tienilo solo su LAN o tailnet.
+- Instagram può chiedere una verifica di sicurezza: l'app ferma la coda come per un account scaduto;
+  risolvila dallo schermo remoto (Accedi) e riavvia.
+- Lo schermo remoto non è cifrato (HTTP): tienilo su rete di casa o VPN.
 - Chrome gira con `--no-sandbox` (normale nei container senza privilegi).
