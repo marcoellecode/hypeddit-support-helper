@@ -13,39 +13,47 @@ Un solo contenitore, `hypeddit-support-helper`:
 - un volume per i dati (profilo del browser con i login, coda, cronologia, impostazioni) e una
   cartella per i download.
 
-## Installazione con Docker Compose
+## Installazione con Docker Compose (server con terminale)
 ```bash
 mkdir hypeddit-support-helper && cd hypeddit-support-helper
 curl -LO https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.yml
-mkdir -p downloads && sudo chown 1000:1000 downloads
+mkdir -p data downloads && sudo chown 1000:1000 data downloads
 docker compose up -d
 ```
 Poi apri `http://<IP-del-server>:5178`.
 
-- Porta occupata? Cambia il numero **a sinistra** in `ports:` (es. `"8178:5178"`) oppure metti
-  `HSH_HOST_PORT=8178` in un file `.env`.
-- Altre opzioni (tutte facoltative) sono in [`.env.example`](.env.example).
+- Porta occupata? Apri `docker-compose.yml` e cambia il numero **a sinistra** in `ports:` (es. `"8178:5178"`).
+- Token, webhook e fuso orario si cambiano nello stesso file, sotto `environment:` (tutto facoltativo).
 - Se l'immagine risulta privata (`pull access denied`): su GitHub, *Packages → hypeddit-support-helper →
   Package settings → Change visibility → Public*.
-- Per costruirla sul posto invece di scaricarla: clona il repository e usa `docker compose up -d --build`.
+- Per costruirla sul posto invece di scaricarla: clona il repository, poi
+  `docker build -t ghcr.io/marcoellecode/hypeddit-support-helper:latest .` e `docker compose up -d`.
 
 ## ZimaOS / CasaOS
-C'è un pacchetto pronto, con nome, icona e descrizione, in
-[`Apps/HypedditSupportHelper`](Apps/HypedditSupportHelper/docker-compose.yml).
+> **Usa il file della cartella `Apps`, non quello della radice del repository.** Il `docker-compose.yml`
+> della radice è per Docker Compose da terminale: CasaOS non interpreta quel formato e mostra porta e
+> volumi sbagliati.
+
+Il file giusto è
+[`Apps/HypedditSupportHelper/docker-compose.yml`](Apps/HypedditSupportHelper/docker-compose.yml), già adattato a
+CasaOS (nome, descrizioni, icona, porta e cartelle):
+
+`https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/Apps/HypedditSupportHelper/docker-compose.yml`
 
 **Metodo 1 — installazione personalizzata (il più semplice)**
 1. *App Store → Installazione personalizzata (Custom Install)*.
-2. Importa il file [`docker-compose.yml`](Apps/HypedditSupportHelper/docker-compose.yml) (o incolla il contenuto).
-3. Installa. Non c'è niente da cambiare: porta `5178`, dati in `/DATA/AppData/hypeddit-support-helper/data`
-   e download in `/DATA/Downloads/Hypeddit` (li vedi dall'app *File*).
+2. Importa il file con l'indirizzo qui sopra (o incolla il contenuto del file).
+3. Controlla che nel modulo ci siano porta **5178 → 5178**, volume `/data` su
+   `/DATA/AppData/hypeddit-support-helper/data` e `/downloads` su `/DATA/Downloads/Hypeddit`, poi **Installa**.
+   Non c'è altro da cambiare; i download li vedi dall'app *File*.
 
 **Metodo 2 — come App Store di terze parti**
 *App Store → ⚙ → aggiungi sorgente* e inserisci
 `https://github.com/marcoellecode/hypeddit-support-helper/archive/refs/heads/main.zip`.
 L'app compare nell'elenco con la sua icona.
 
-Se la porta 5178 è occupata, cambia **solo il numero `published`** nelle impostazioni dell'app: tutto
-continua a funzionare (anche lo schermo remoto), perché passa da quella unica porta.
+Se la porta 5178 è occupata, cambia **solo il numero della porta Host** nel modulo: tutto continua a
+funzionare (anche lo schermo remoto), perché passa da quella unica porta.
 Il container gira come root perché le cartelle `/DATA` di ZimaOS sono di root.
 
 ## Primo accesso agli account (una volta sola)

@@ -1,30 +1,29 @@
-# Uso: `docker compose up -d` (scarica l'immagine pubblicata da GitHub) oppure
-# `docker compose up -d --build` per costruirla qui. Non serve configurare nulla.
-# Per ZimaOS / CasaOS usa invece Apps/HypedditSupportHelper/docker-compose.yml.
+# Docker Compose "classico" (server Linux con SSH/terminale). Nessuna variabile da impostare:
+# se vuoi cambiare qualcosa (porta, token, cartelle) modifica direttamente i valori qui sotto.
+#
+#   mkdir -p data downloads && sudo chown 1000:1000 data downloads
+#   docker compose up -d
+#
+# ATTENZIONE - ZimaOS / CasaOS: NON importare questo file. Usa invece
+#   Apps/HypedditSupportHelper/docker-compose.yml  (vedi DOCKER.md, sezione "ZimaOS").
 # Dettagli (primo accesso agli account, aggiornamenti, problemi): DOCKER.md
 name: hypeddit-support-helper
 
 services:
   hypeddit-support-helper:
-    build: .
-    # immagine pubblicata da GitHub Actions; `build: .` serve solo se vuoi costruirla qui
     image: ghcr.io/marcoellecode/hypeddit-support-helper:latest
     container_name: hypeddit-support-helper
     hostname: hypeddit-support-helper   # fisso: dopo un ricreo Chrome non vede il profilo come "di un altro PC"
     restart: unless-stopped
     shm_size: "1gb"                     # Chrome in container crasha con la /dev/shm di default (64 MB)
     environment:
-      TZ: ${TZ:-Europe/Rome}
-      # FACOLTATIVI (lascia vuoti se non servono):
-      HSH_API_TOKEN: ${HSH_API_TOKEN:-}       # protegge cruscotto e API da altri dispositivi della rete
-      HSH_WEBHOOK_URL: ${HSH_WEBHOOK_URL:-}   # riceve un POST per "account scaduto" e "coda finita"
+      TZ: Europe/Rome
+      HSH_API_TOKEN: ""                 # FACOLTATIVO: protegge cruscotto e API (lascia vuoto su rete di casa)
+      HSH_WEBHOOK_URL: ""               # FACOLTATIVO: avvisi per "account scaduto" e "coda finita"
     ports:
       # Cambia SOLO il numero a sinistra se la 5178 e' occupata sul server: tutto (anche lo schermo
       # remoto del login) passa da questa unica porta.
-      - "${HSH_HOST_PORT:-5178}:5178"
+      - "5178:5178"
     volumes:
-      - hsh-data:/data                                # profilo browser (login), coda, cronologia, impostazioni
-      - ${HSH_DOWNLOADS_DIR:-./downloads}:/downloads  # i file scaricati (la cartella deve essere scrivibile da uid 1000)
-
-volumes:
-  hsh-data:
+      - ./data:/data              # profilo browser (login), coda, cronologia, impostazioni: trattalo come una password
+      - ./downloads:/downloads    # i file scaricati

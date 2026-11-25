@@ -1,5 +1,5 @@
 # Pacchetto per ZimaOS / CasaOS.
-#  - Installazione personalizzata: App Store -> "Installazione personalizzata" -> importa questo file.
+#  - Installazione personalizzata: App Store -> "Installazione personalizzata" -> incolla/importa QUESTO file.
 #  - App Store di terze parti: aggiungi come sorgente
 #      https://github.com/marcoellecode/hypeddit-support-helper/archive/refs/heads/main.zip
 #    (l'app compare con icona e descrizione). Guida: DOCKER.md, sezione "ZimaOS".
@@ -23,7 +23,7 @@ services:
         protocol: tcp
     volumes:
       - type: bind
-        source: /DATA/AppData/$AppID/data
+        source: /DATA/AppData/hypeddit-support-helper/data
         target: /data
       - type: bind
         source: /DATA/Downloads/Hypeddit

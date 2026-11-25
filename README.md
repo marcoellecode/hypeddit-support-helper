@@ -127,14 +127,15 @@ Registry. **Solo x86-64**: Google Chrome per Linux non esiste per ARM. **Non ser
 ```bash
 mkdir hypeddit-support-helper && cd hypeddit-support-helper
 curl -LO https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/docker-compose.yml
-mkdir -p downloads && sudo chown 1000:1000 downloads
+mkdir -p data downloads && sudo chown 1000:1000 data downloads
 docker compose up -d
 ```
 Poi apri `http://<IP-del-server>:5178`.
 
-- **ZimaOS / CasaOS:** c'è un pacchetto pronto, con icona e descrizione, in
+- **ZimaOS / CasaOS:** NON usare il compose della radice. C'è un pacchetto pronto, con icona e descrizione, in
   [`Apps/HypedditSupportHelper`](Apps/HypedditSupportHelper/docker-compose.yml): importalo in
-  *Installazione personalizzata* oppure aggiungi il repository come App Store di terze parti.
+  *Installazione personalizzata* oppure aggiungi il repository come App Store di terze parti
+  (dettagli in [DOCKER.md](DOCKER.md#zimaos--casaos)).
 - Il login degli account avviene da uno **schermo remoto aperto nel browser**, sulla stessa porta dell'app.
 - Tutti i dettagli (porta diversa, primo accesso agli account, sicurezza, aggiornamenti, problemi):
   **[DOCKER.md](DOCKER.md)**.
