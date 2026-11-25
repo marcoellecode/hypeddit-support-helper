@@ -1,81 +1,26 @@
-# Hypeddit Support Helper per ZimaOS / CasaOS (e compatibile con Docker Compose).
-# ZimaOS/CasaOS: App Store -> "Installazione personalizzata" -> importa questo file. Non serve cambiare niente:
-# installa, apri l'app e collega gli account da Impostazioni. I dati stanno in /DATA/AppData/hypeddit-support-helper.
-# Copia identica in Apps/HypedditSupportHelper/ (serve per aggiungere il repository come App Store di terze parti).
-# Server Linux generico (non CasaOS), con cartelle ./data e ./downloads: usa docker-compose.linux.yml.
+# Docker Compose per un server Linux GENERICO (con terminale). Nessuna variabile da impostare:
+# se vuoi cambiare qualcosa (porta, token, cartelle) modifica i valori qui sotto.
+#
+#   mkdir -p data downloads && sudo chown 1000:1000 data downloads
+#   docker compose up -d
+#
+# ATTENZIONE - ZimaOS / CasaOS: NON importare questo file. Usa invece
+#   Apps/HypedditSupportHelper/docker-compose.yml  (vedi DOCKER.md, sezione "ZimaOS / CasaOS").
 name: hypeddit-support-helper
+
 services:
   hypeddit-support-helper:
     image: ghcr.io/marcoellecode/hypeddit-support-helper:latest
     container_name: hypeddit-support-helper
+    hostname: hypeddit-support-helper   # fisso: dopo un ricreo Chrome non vede il profilo come "di un altro PC"
     restart: unless-stopped
-    user: "0:0"
-    network_mode: bridge
-    privileged: false
-    cpu_shares: 90
-    command: []
-    cap_add: []
-    devices: []
+    shm_size: "1gb"
     environment:
-      - TZ=Europe/Rome
+      TZ: Europe/Rome
+      HSH_API_TOKEN: ""                 # FACOLTATIVO: protegge cruscotto e API (lascia vuoto su rete di casa)
+      HSH_WEBHOOK_URL: ""               # FACOLTATIVO: avvisi per "account scaduto" e "coda finita"
     ports:
-      - target: 5178
-        published: "5178"
-        protocol: tcp
+      - "5178:5178"                     # cambia il numero a sinistra se la 5178 e' occupata
     volumes:
-      - type: bind
-        source: /DATA/AppData/hypeddit-support-helper/data
-        target: /data
-      - type: bind
-        source: /DATA/AppData/hypeddit-support-helper/downloads
-        target: /downloads
-    x-casaos:
-      envs:
-        - container: TZ
-          description:
-            en_us: Time zone
-            it_it: Fuso orario
-      ports:
-        - container: "5178"
-          description:
-            en_us: Web interface and API (the remote login screen uses this port too)
-            it_it: Interfaccia web e API (anche lo schermo remoto del login usa questa porta)
-      volumes:
-        - container: /data
-          description:
-            en_us: Browser profile (logins), queue, history and settings. Treat it like a password.
-            it_it: Profilo del browser (login), coda, cronologia e impostazioni. Trattalo come una password.
-        - container: /downloads
-          description:
-            en_us: Downloaded files
-            it_it: File scaricati
-x-casaos:
-  architectures:
-    - amd64
-  main: hypeddit-support-helper
-  author: marcoellecode
-  developer: marcoellecode
-  category: Media
-  icon: https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/Apps/HypedditSupportHelper/icon.png
-  thumbnail: https://raw.githubusercontent.com/marcoellecode/hypeddit-support-helper/main/Apps/HypedditSupportHelper/icon.png
-  title:
-    en_us: Hypeddit Support Helper
-    it_it: Hypeddit Support Helper
-  tagline:
-    en_us: Support artists on Hypeddit download gates with real actions, automatically
-    it_it: Supporta gli artisti sui download gate di Hypeddit con azioni reali, in automatico
-  description:
-    en_us: |
-      Automates the repetitive steps of Hypeddit download gates while performing the REAL actions
-      (follow, like, repost, comment) with your own accounts. It never bypasses the gate or fakes a step.
-      Web dashboard, REST API and a remote screen to sign in to SoundCloud, Spotify and Instagram once.
-      Automating actions on social accounts may violate those platforms' terms: use at your own risk.
-    it_it: |
-      Automatizza i passaggi ripetitivi dei download gate di Hypeddit compiendo le azioni REALI
-      (follow, like, repost, commento) con i tuoi account. Non aggira mai il gate e non falsifica gli step.
-      Cruscotto web, API REST e schermo remoto per accedere una volta a SoundCloud, Spotify e Instagram.
-      Automatizzare azioni sugli account social puo' violare i termini di quelle piattaforme: lo usi a tuo rischio.
-  index: /
-  port_map: "5178"
-  scheme: http
-  project_url: https://github.com/marcoellecode/hypeddit-support-helper
+      - ./data:/data              # profilo browser (login), coda, cronologia, impostazioni: trattalo come una password
+      - ./downloads:/downloads    # i file scaricati
